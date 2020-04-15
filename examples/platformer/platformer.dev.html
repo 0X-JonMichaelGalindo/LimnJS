@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Platformer Limn Demo</title>
+        <script type="text/javascript" global-name="platformer" source-directory="source" src="limn.beta.0.1.js"></script>
+        <script type="text/javascript">
+            window.onload = async function() {
+                let start = await platformer( "Main.start" );
+                start();
+                //platformer.Explore( document.body, "Main.start" );
+            }
+        </script>
+    </head>
+</html>
