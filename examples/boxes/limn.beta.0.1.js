@@ -31,8 +31,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 "use strict";
 
 ( async function LimnInit() {
-	var __LIVE_MODE__ = false,
-		__VERSION__ = "beta.0.1";
+	var __VERSION__ = "beta.0.1";
 
 	var urls = {},
 		outlinesPendingURL = [],
@@ -59,7 +58,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		*/
 		ListenersForParsing = {},
 		LimnAlias = "Limn",
-		limnDirectory = null;
+		limnDirectory = null,
+		buildVersion = 0,
+		useArchaicJS = false,
+		noPromisePolyfill = false;
 
 	var illegalNameCharacters = /[^/\w\d_\-.]|\.\./gi,
 		illegalOutlineCharacters = /[^/\w\d_\-.*()|]|\.\./gi,
@@ -77,13 +79,25 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 					let directory = s.getAttribute( "source-directory" ),
 						globalName = s.getAttribute( "global-name" ),
 						loaded = s.getAttribute( "finished-loading" ),
-						conflict = s.getAttribute( "conflicting-names" );
+						conflict = s.getAttribute( "conflicting-names" ),
+						version = s.getAttribute( "build-version" ),
+						archaic = s.getAttribute( "use-archaic-js" ),
+						noPromise = s.getAttribute( "no-promise-polyfill" );
+						
+					if( archaic && archaic.toLowerCase() === "false" )
+						archaic = false;
+					if( noPromise && noPromise.toLowerCase() === "false" )
+						noPromise = false;
+
 					if( conflict ) continue;
 					else allLimns.push( {
 						node: s,
 						directory: directory || null,
 						globalName: globalName || null,
 						loaded: loaded || false,
+						version: version,
+						archaic: archaic,
+						noPromise: noPromise
 					} );
 				}
 			}
@@ -138,7 +152,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		}
 	}
 	function becomeLimn( info ) {
-		const { node, directory, globalName } = info;
+		const { node, directory, globalName, version, archaic, noPromise } = info;
 		if( directory ) {
 			let illegalMatch = directory.match( illegalDirectoryCharacters );
 			if( illegalMatch !== null ) {
@@ -152,9 +166,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 			}
 			else limnDirectory = directory.replace( /\/$/, "" );
 		}
-		if( globalName ) {
-			LimnAlias = globalName;
-		}
+		if( globalName ) LimnAlias = globalName;
+		if( version ) buildVersion = version;
+		if( archaic ) useArchaicJS = true;
+		if( noPromise ) noPromisePolyfill = true;
 		node.setAttribute( "finished-loading", "true" );
 	}
 	let nextLimn = getNextWaitingLimn();
@@ -813,7 +828,13 @@ ${LimnAlias}( "${fullName}", {
 			return true;
 		//array template
 		else if( Array.isArray( outline ) === true ) {
-			for( let entry of outline ) {
+			//for( let entry of outline ) {
+			for( let i = 0; i < outline.length; i ++ ) {
+				let entry = outline[ i ];
+				//etcetera operation ("...") allowed only on last entry
+				if( outline.length > 1 &&
+					i === outline.length - 1 && 
+					entry === "..." ) continue;
 				let validity = isValidOutline( entry );
 				if( validity !== true )
 					return validity;
@@ -850,6 +871,31 @@ ${LimnAlias}( "${fullName}", {
 		return false;
 	}
 
+	function isIdentity( outline, history ) {
+		if( ! history ) history = {};
+		if( typeof outline === "string" &&
+			outline.indexOf( "*" ) > -1 ) {
+			if( outline.indexOf( "|" ) > -1 ) {
+				for( let o of outline.split( "|" ) ) {
+					if( isIdentity( o, history ) )
+						return true;
+				}
+				return false;
+			}
+			else {
+				if( history[ outline ] ) return true;
+				else {
+					history[ outline ] = true;
+					if( outlines[ outline ] &&
+						isIdentity( outlines[ outline ], history ) )
+						return true;
+					else return false;
+				}
+			}
+		}
+		else return false;
+	}
+
 	const O = {
 		types: {
 			"any": () => true,
@@ -881,7 +927,150 @@ ${LimnAlias}( "${fullName}", {
 		}
 	}
 
-	function fitsOutline( target, outline ) {
+	const fitTerminators = {
+		//TODO: After debug, swap these out for makeFitHistory( check ) calls.
+		makeTargetFitHistory: () => {
+			var targetFitHistoryByType = {
+				"object": new WeakMap(),
+				"boolean": {
+					"true": fitTerminators.makeOutlineFitHistory(),
+					"false": fitTerminators.makeOutlineFitHistory()
+				},
+				"NaN":  fitTerminators.makeOutlineFitHistory(),
+				"null":  fitTerminators.makeOutlineFitHistory(),
+				"number": {},
+				"bigint": {},
+				"stringSymbol": {},
+				"undefined":  fitTerminators.makeOutlineFitHistory(),
+			}
+			return targetFitHistoryByType;
+		},
+		makeOutlineFitHistory: () => {
+			var outlineFitHistoryByType = {
+				"object": new WeakMap(),
+				"boolean": {
+					"true": fitTerminators.makeFitCheck(),
+					"false": fitTerminators.makeFitCheck(),
+				},
+				"NaN": fitTerminators.makeFitCheck(),
+				"null": fitTerminators.makeFitCheck(),
+				"number": {},
+				"bigint": {},
+				"stringSymbol": {},
+				"undefined": fitTerminators.makeFitCheck(),
+			}
+			return outlineFitHistoryByType;
+		},
+		makeFitCheck: () => { return { checked: false } },
+		/*
+		makeFitHistory: ( makeFitCheck ) => {
+			var fitHistory = {
+				"object": new WeakMap(),
+				"boolean": {
+					"true": makeFitCheck(),
+					"false": makeFitCheck(),
+				},
+				"NaN": makeFitCheck(),
+				"null": makeFitCheck(),
+				"number": {},
+				"bigint": {},
+				"stringSymbol": {},
+				"undefined": makeFitCheck(),
+			}
+			return fitHistory;
+		},
+		*/
+		getOutlineFitCheck: ( outline, fitHistories ) => {
+			if( outline === null )
+				return fitHistories[ "null" ];
+			else if( outline === undefined )
+				return fitHistories[ "undefined" ];
+			else if( typeof outline === "boolean" )
+				return fitHistories[ "boolean" ][ outline ];
+			else if( typeof outline === "number" ) {
+				if( isNaN( outline ) )
+					return fitHistories[ "NaN" ];
+				else {
+					let fitHistory = fitHistories[ "number" ][ outline ];
+					if( ! fitHistory ) {
+						fitHistory = fitHistories[ "number" ][ outline ] =
+							fitTerminators.makeFitCheck();
+					}
+					return fitHistory;
+				}
+			}
+			else if( typeof outline === "bigint" )
+				return fitHistories[ "bigint" ][ outline ];
+			else if( typeof outline === "string" ||
+				typeof outline === "symbol" ) {
+				let fitHistory = fitHistories[ "stringSymbol" ][ outline ];
+				if( ! fitHistory ) {
+					fitHistory = fitHistories[ "stringSymbol" ][ outline ] =
+						fitTerminators.makeFitCheck();
+				}
+				return fitHistory;
+			}
+			else if( typeof outline === "object" ||
+				typeof outline === "function" ) {
+				let fitHistory = fitHistories[ "object" ].get( outline );
+				if( ! fitHistory ) {
+					fitHistory = fitTerminators.makeFitCheck();
+					fitHistories[ "object" ].set( outline, fitHistory );
+				}
+				return fitHistory;
+			}
+		},
+		getTargetFitHistory( target, fitHistories ) {
+			if( target === null )
+				return fitHistories[ "null" ];
+			else if( target === undefined )
+				return fitHistories[ "undefined" ];
+			else if( typeof target === "boolean" )
+				return fitHistories[ "boolean" ][ target ];
+			else if( typeof target === "number" ) {
+				if( isNaN( target ) )
+					return fitHistories[ "NaN" ];
+				else {
+					let fitHistory = fitHistories[ "number" ][ target ];
+					if( ! fitHistory ) {
+						fitHistory = fitHistories[ "number" ][ target ] =
+							fitTerminators.makeOutlineFitHistory();
+					}
+					return fitHistory;
+				}
+			}
+			else if( typeof target === "bigint" )
+				return fitHistories[ "bigint" ][ target ];
+			else if( typeof target === "string" ||
+				typeof target === "symbol" ) {
+				let fitHistory = fitHistories[ "stringSymbol" ][ target ];
+				if( ! fitHistory ) {
+					fitHistory = fitHistories[ "stringSymbol" ][ target ] =
+						fitTerminators.makeOutlineFitHistory();
+				}
+				return fitHistory;
+			}
+			else if( typeof target === "object" ||
+				typeof target === "function" ) {
+				let fitHistory = fitHistories[ "object" ].get( target );
+				if( ! fitHistory ) {
+					fitHistory = fitTerminators.makeOutlineFitHistory();
+					fitHistories[ "object" ].set( target, fitHistory );
+				}
+				return fitHistory;
+			}
+		}
+	}
+
+	function fitsOutline( target, outline, fitHistories ) {
+		if( ! fitHistories ) fitHistories = fitTerminators.makeTargetFitHistory();
+		const targetFitHistory = fitTerminators.getTargetFitHistory( target, fitHistories );
+		const fitCheck = fitTerminators.getOutlineFitCheck( outline, targetFitHistory );
+
+		if( fitCheck.checked === true ) return true;
+		else fitCheck.checked = true;
+		
+
 		//reference to: primitive, union, intersection, or outline
 		if( typeof outline === "string" ) {
 			outline = outline.
@@ -893,13 +1082,19 @@ ${LimnAlias}( "${fullName}", {
 				return O.types[ outline ]( target );
 			//reference to union
 			else if( outline.indexOf( "|" ) > -1 ) {
-				for( let o of outline.split( "|" ) )
-					if( fitsOutline( target, o ) )
+				let checkedOutlines = {};
+				for( let o of outline.split( "|" ) ) {
+					//re-checking the same outline will return true
+					//	due to recursion history testing
+					if( checkedOutlines[ o ] ) continue;
+					checkedOutlines[ o ] = true;
+					if( fitsOutline( target, o, fitHistories ) )
 						return true;
+				}
 				return false;
 			}
 			//reference to function outline
-			else if( outline.indexOf( "()*" ) > -1 ) {
+			else if( outline.length > 3 && outline.indexOf( "()*" ) > -1 ) {
 				return O.types[ "function" ]( target );
 			}
 			//reference to intersection or outline
@@ -908,13 +1103,13 @@ ${LimnAlias}( "${fullName}", {
 				//reference to intersection
 				if( intersect.length > 1 ) {
 					for( let m of intersect )
-						if( ! fitsOutline( target, m ) )
+						if( ! fitsOutline( target, m, fitHistories ) )
 							return false;
 					return true;
 				}
 				//reference to outline
 				else if( outline in outlines )
-					return fitsOutline( target, outlines[ outline ] );
+					return fitsOutline( target, outlines[ outline ], fitHistories );
 				else return false;
 			}
 		}
@@ -925,16 +1120,33 @@ ${LimnAlias}( "${fullName}", {
 		//array template
 		else if( Array.isArray( outline ) ) {
 			if( ! Array.isArray( target ) ) return false;
-			else if( target.length > 0 &&
-				( target.length % outline.length) !== 0 )
-					return false;
+			if( outline[ outline.length - 1 ] === "..." ) {
+				if( target.length > 0 &&
+					( target.length % ( outline.length - 1 ) ) !== 0 )
+						return false;
+				else {
+					for( let i=0; i<target.length; i++ )
+						if( ! fitsOutline( 
+								target[ i ], 
+								outline[ i % ( outline.length - 1 ) ],
+								fitHistories
+							) ) return false;
+					return true;
+				}
+			}
 			else {
-				for( let i=0; i<target.length; i++ )
-					if( ! fitsOutline( 
-							target[ i ], 
-							outline[ i % outline.length ] 
+				if( target.length !== outline.length )
+					return false;
+				else {
+					for( let i=0; i<outline.length; i++ ) {
+						if( ! fitsOutline(
+							target[ i ],
+							outline[ i ],
+							fitHistories
 						) ) return false;
-				return true;
+					}
+					return true;
+				}
 			}
 		}
 		//documented function outline
@@ -947,12 +1159,15 @@ ${LimnAlias}( "${fullName}", {
 				target === null ) return false;
 			else {
 				let outlineKeys = Object.keys( outline );
-				for( let key of outlineKeys )
-					if( !( key in target ) ||
-						! fitsOutline( 
+				for( let key of outlineKeys ) {
+					if( !( key in target ) )
+						return false;
+					else if( ! fitsOutline(
 							target[ key ], 
-							outline[ key ] 
+							outline[ key ],
+							fitHistories
 						) ) return false;
+				}
 				return true;
 			}
 		}
@@ -1129,7 +1344,6 @@ ${LimnAlias}( "${fullName}", {
 	}
 
 	var methodOutlineKey = {};
-	window.getOutline =
 	function getOutline( name ) {
 		name = name.replace( /\//g, "." );
 		if( outlines.hasOwnProperty( name ) ) {
@@ -1219,24 +1433,26 @@ ${LimnAlias}( "${fullName}", {
 			[ /"Float32Array"/g, "<i>Float32Array</i>" ],
 			[ /"Float64Array"/g, "<i>Float64Array</i>" ]
 		];
+	
 	function formatLimnaryName( nt ) {
 		nt = nt.replace( /\//g, "." );
 		let baseNt = nt.replace( /("[/\w\d_\-.()*]+")[^:]/gi, "$1" ),
 			formattedBaseNt = baseNt.replace( /"/g, "" ),
-			formattedNt = "";
+			formattedNt = "",
+			isid = isIdentity( formattedBaseNt ) ? 
+				"<em>&lt; identity <i>any</i> &gt;</em>" : "";
 		//could be a type name
-		if( ( baseNt.indexOf( "*" ) > -1 &&
+		if( formattedBaseNt !== "..." &&
+			( ( baseNt.indexOf( "*" ) > -1 &&
 			getOutline( formattedBaseNt ) === false ) ||
 			( baseNt.indexOf( "*" ) === -1 &&
-			! Limnaries[ formattedBaseNt ] ) ) {
+			! Limnaries[ formattedBaseNt ] ) ) ) {
 				formattedNt = nt.replace( baseNt,
 					"<span>" + formattedBaseNt + 
 					" (definition not found!)</span>" );
-				if( formattedBaseNt === "any" )
-					console.error( "How did this happen?" );
 			}
 		else formattedNt = nt.replace( baseNt,
-			"<b>" + formattedBaseNt + "</b>" );
+			"<b>" + formattedBaseNt + isid + "</b>" );
 		return formattedNt;
 	};
 	/*
@@ -1264,9 +1480,7 @@ ${LimnAlias}( "${fullName}", {
 			if( type.indexOf( "|" ) > -1 ) {
 				extractTypeDependencies( type.split( "|" ), set )
 			}
-			else if( type === "object" || type === "null" ||
-				outlineTypes.primitives.hasOwnProperty( type ) ||
-				outlineTypes.objects.hasOwnProperty( type ) ) return;
+			else if( O.types[ type ] || type === "..." ) return;
 			else set.add( type );
 		}
 		else if( Array.isArray( type ) ) {
@@ -1319,7 +1533,7 @@ ${LimnAlias}( "${fullName}", {
 			t = formatLimnaryName( t );
 		}
 		t = t.replace( /,/g, ",<br>" );
-		t = t.replace( /\]/g, ",<br>...</div>]" );
+		t = t.replace( /\]/g, "</div>]" );
 		t = t.replace( /\[/g, "[<div>" );
 		t = t.replace( /\{/g, "{<div>" );
 		t = t.replace( /\}/g, "</div>}" );
@@ -1380,11 +1594,13 @@ ${LimnAlias}( "${fullName}", {
 		else name = formatLimnaryName( name ).trim();
 		return name;
 	}
+	
 	function getDetail( name ) {
 		name = name.replace( /\//g, "." );
 		let sum = "";
 		if( name.indexOf( "*" ) === -1 ||
-			name.indexOf( "()*" ) === name.length - 3 ) {
+			( name.length > 3 &&
+			name.indexOf( "()*" ) === name.length - 3 ) ) {
 				sum = getSummary( name );
 			}
 		else {
@@ -1424,7 +1640,8 @@ ${LimnAlias}( "${fullName}", {
 						"\" >";
 				return joinedNames;
 			}
-			else if( name.indexOf( "()*" ) === name.length - 3 ) {
+			else if( name.length > 3 &&
+				name.indexOf( "()*" ) === name.length - 3 ) {
 				let summary = getSummary( name );
 				return summary || name;
 			}
@@ -1471,6 +1688,7 @@ ${LimnAlias}( "${fullName}", {
 				throw "Inherent Outline Definition Violation";
 			}
 			else if( name.match( /[*]/g ).length === 1 &&
+				name.length > 3 &&
 				name.indexOf( "()*" ) === name.length-3 ) {
 				//it's a function outline defintion
 				outlines[ name ] = def;
@@ -1509,15 +1727,184 @@ ${LimnAlias}( "${fullName}", {
 		}
 	}
 
+const promisePolyfill = `'use strict';var G="function"==typeof Object.defineProperties?Object.defineProperty:function(p,r,t){p!=Array.prototype&&p!=Object.prototype&&(p[r]=t.value)};function L(p){p=["object"==typeof globalThis&&globalThis,"object"==typeof window&&window,"object"==typeof self&&self,"object"==typeof global&&global,p];for(var r=0;r<p.length;++r){var t=p[r];if(t&&t.Math==Math)return t}throw Error("Cannot find global object");}var M=L(this);function Q(){Q=function(){};M.Symbol||(M.Symbol=R)}
+function S(p,r){this.a=p;G(this,"description",{configurable:!0,writable:!0,value:r})}S.prototype.toString=function(){return this.a};var R=function(){function p(t){if(this instanceof p)throw new TypeError("Symbol is not a constructor");return new S("jscomp_symbol_"+(t||"")+"_"+r++,t)}var r=0;return p}();
+(function(p){function r(b){b()}function t(b){b(this)}function H(){if(y){do u=!1,D.shift()();while(--y)}u=!1}function B(b,k,d){this.then=b;this["catch"]=k;this["finally"]=d}function v(b){function k(a){0===h&&(F(a)?a.then(k,d):(g=a,h=2,null!==e&&("function"===typeof e?e(a):e.forEach(t,a),e=null),c=null,null!==l&&("function"===typeof l?l():l.forEach(r),l=null)))}function d(a){0===h&&(g=a,h=1,null!==c&&("function"===typeof c?c(a):c.forEach(t,a),c=null),e=null,null!==l&&("function"===typeof l?l():l.forEach(r),
+l=null))}var g,h=0,e=null,c=null,l=null,f=new B(function(a,m){void 0!=a&&"function"!==typeof a&&console.warn(Object.prototype.toString.call(a)+" is not a valid function to be called after a successful promise");void 0!=m&&"function"!==typeof m&&console.warn(Object.prototype.toString.call(m)+" is not a valid function to be called after a rejected promise");if(0===h)return I(function(w,C){var z="function"===typeof a?function(){w(a(g))}:w,J="function"===typeof m?function(){C(m(g))}:C;null!==e?"function"===
+typeof e?e=[e,z]:e.push(z):e=z;null!==c?"function"===typeof c?c=[c,J]:c.push(J):c=J});try{return 2===h?"function"===typeof a?E(a(g)):x:"function"===typeof m?q(m(g)):x}catch(w){return q(w)}},function(a){void 0!=a&&"function"!==typeof a&&console.warn(Object.prototype.toString.call(a)+" is not a valid function to be called after a rejected promise");if(0===h)return I(function(m){null!==c?"function"===typeof c?c=[c,function(){m(a(g))}]:c.push(function(){m(a(g))}):c=function(){m(a(g))};null!==e?"function"===
+typeof e?e=[e,m]:e.push(m):e=m});if(2===h)return E(g);try{return"function"===typeof a?E(a(g)):x}catch(m){return q(m)}},function(a){void 0!=a&&"function"!==typeof a&&console.warn(Object.prototype.toString.call(a)+" is not a valid function to be called 'finally' after promise");if(0===h)null!==l?"function"===typeof l?l=[l,a]:l.push(a):l=a;else try{a()}catch(m){return q(m)}return f});if(!0===u)D.push(function(){try{b(k,d)}catch(a){d(a)}}),y=y+1|0;else{n=n+1|0;if(u=128===n)try{b(k,d)}catch(a){d(a)}else{try{b(k,
+d)}catch(a){d(a)}!0===u&&1===n&&H()}n=n-1|0}return f}function I(b){function k(f){0===g&&(d=f,g=1,null!==e&&("function"===typeof e?e(f):e.forEach(t,f),e=null),h=null,null!==c&&("function"===typeof c?c():c.forEach(r),c=null))}var d,g=0,h=null,e=null,c=null,l=new B(function(f,a){f&&"function"!==typeof f&&console.error(Object.prototype.toString.call(f)+" is not a valid function to be called after a successful promise");a&&"function"!==typeof a&&console.error(Object.prototype.toString.call(a)+" is not a valid function to be called after a rejected promise");
+if(0===g)return v(function(m,w){var C="function"===typeof f?function(){m(f(d))}:m,z="function"===typeof a?function(){w(a(d))}:w;null!==h?"function"===typeof h?h=[h,C]:h.push(C):h=C;null!==e?"function"===typeof e?e=[e,z]:e.push(z):e=z});try{return 2===g?"function"===typeof f?A(f(d)):x:"function"===typeof a?q(a(d)):x}catch(m){return q(m)}},function(f){f&&"function"!==typeof f&&console.error(Object.prototype.toString.call(f)+" is not a valid function to be called after a rejected promise");if(0===g)return v(function(a){null!==
+e?"function"===typeof e?e=[e,function(){a(f(d))}]:e.push(function(){a(f(d))}):e=function(){a(f(d))};null!==h?"function"===typeof h?h=[h,a]:h.push(a):h=a});if(2===g)return A(d);try{return"function"===typeof f?A(f(d)):x}catch(a){return q(a)}},function(f){"function"!==typeof f&&console.error(Object.prototype.toString.call(f)+" is not a valid function to be called 'finally' after promise");0===g?null!==c?"function"===typeof c?c=[c,f]:c.push(f):c=f:f();return l});try{b(function m(a){0===g&&(F(a)?a.then(m,
+k):(d=a,g=2,null!==h&&("function"===typeof h?h(a):h.forEach(t,a),h=null),null!==c&&("function"===typeof c?c():c.forEach(r),c=null),e=null))},k)}catch(f){k(f)}return l}function A(b){if("object"===typeof b&&null!==b&&"function"===typeof b.then)return b;var k=new B(function(d){if("function"!==typeof d)return k;if(!0===u)return I(function(h,e){D.push(function(){try{h(d(b))}catch(c){e(c)}});y=y+1|0});n=n+1|0;var g=null;try{(u=128===n)?D.push(function(){d(b)}):(g=d(b),!0===u&&1===n&&H())}catch(h){return q(h)}finally{n=
+n-1|0}return E(g)},function(){return k},function(d){if("function"===typeof d)if(!0===u)D.push(d),y=y+1|0;else{n=n+1|0;try{(u=128===n)?(d(),u=!1):(d(),!0===u&&1===n&&H())}catch(g){return q(g)}finally{n=n-1|0}}return k});return k}function E(b){if("object"===typeof b&&null!==b&&"function"===typeof b.then)return b;var k=new B(function(d){try{return"function"===typeof d?A(d(b)):x}catch(g){return q(g)}},function(){return k},function(d){try{"function"===typeof d&&d()}catch(g){return q(g)}return k});return k}
+function q(b){if("object"===typeof b&&null!==b&&"function"===typeof b.then)return b;var k=new B(function(d,g){try{return"function"===typeof g?A(g(b)):x}catch(h){return q(h)}},function(d){try{return"function"===typeof d?A(d(b)):x}catch(g){return q(g)}},function(d){try{"function"===typeof d&&d()}catch(g){return q(g)}return k});return k}function N(b,k){if("object"!==typeof b||"function"!==typeof b.forEach)return console.error(Object.prototype.toString.call(b)+" is not a valid iterable array of promises. If you are using an array-like object, you must call Array.prototype.slice.call on the object before passing it to SPromise."+
+k),x}function K(b){return b===p?b.b=v:v}var D=[],F=v.isPromise=function(b){return"object"===typeof b&&null!==b&&"function"===typeof b.then},n=0,u=!1,y=0;Q();Q();var O=""+void 0!==typeof Symbol&&Symbol.toStringTag,x=A(void 0);"symbol"===typeof O&&(B.prototype[O]="Promise");v.resolve=E;v.reject=q;var P=!1;v.race=function(b){N(b,"race");P||b.length||(P=!0,console.warn(Object.prototype.toString.call(b)+" is an empty array of promises passed to SPromise"));return v(function(k,d){function g(f){e&&(e=
+0,k(f))}function h(f){e&&(e=0,d(f))}for(var e=1,c=0,l;c<b.length&&e;c=c+1|0)F(l=b[c])?l.then(g,h):g(l)})};v.all=function(b){N(b,"all");return v(function(k,d){function g(m){a.then(function(w){l[m|0]=w;c=c-1|0;0===c&&k(l)},function(w){0<c&&(c=-1,d(w))})}for(var h=null,e=b.length|0,c=e,l=[],f=0,a;f<e;f=f+1|0)F(a=b[f])?(l[f]=h,g(f)):(c=c-1|0,l[f]=h=a);0===c&&k(l)})};"object"===typeof exports&&""+void 0!==typeof module?module.exports=v:typeof define==typeof K&&"function"===typeof define&&define.amd?
+define(K):K(p)})("object"==typeof self?self:"object"==typeof global?global:this);`
+/*
+	Promise Polyfill
+	Anonyco's public domain SPromiseMeSpeedJS.
+	https://github.com/anonyco/SPromiseMeSpeedJS
+*/
+
+function checkIfUsingEmit() {
+	let usingEmitter = false;
+	for( let name in LimnaryDefinitions )
+		if( LimnaryDefinitions[ name ].emits ) {
+			usingEmitter = true;
+			break;
+		}
+	return usingEmitter;
+}
+
+function ArchaicBuild( globalName ) {
+	//compatible with IE 9 (Object.freeze, Function.prototype.apply with generic array arguments)
+	let usingEmitter = checkIfUsingEmit();
+	let emitFunction = usingEmitter ?
+`${globalName}.e = function( name, detail ) {
+	return new Promise( function( endEmit ) {
+		var alls = [];
+		for( var i=0; i < Listeners[ name ].length; i++ ) {
+			var l = Listeners[ name ][ i ];
+			var v = l( name, detail );
+			if( v && ( typeof v.then === "function" ) )
+				alls.push( v );
+		}
+		if( alls.length > 0 )
+			Promise.all( alls ).then( function() {
+				endEmit();
+			} );
+		else endEmit();
+	} )
+};` : "",
+		addLimnaryFunction = `${globalName}._ =
+function( ${globalName} ) {
+	${globalName}.method = ${globalName}.factory();
+	${globalName}.limn = ${globalName}.Limnaries[ ${globalName}.name ] =
+	( function( ${globalName} ) { return function() {
+		var newArgs = [ test.limnaries ];
+		for( var i = 0; i < arguments.length; i ++ )
+			newArgs.push( arguments[ i ] );
+		return ${globalName}.method.apply( this, newArgs );
+	} } )( Object.freeze( { method: ${globalName}.method, limnaries: ${globalName}.limnaries } ) )
+
+${ usingEmitter ? `	if( ${globalName}.emit ) ${globalName}.limnaries.emit = ${globalName}.emit;
+	if( ${globalName}.listen ) {
+		for( var i = 0; i < ${globalName}.listen.length; i ++ ) {
+			var l = ${globalName}.listen[ i ];
+			if( ! ${globalName}.Listeners[ l ] ) ${globalName}.Listeners[ l ] = [];
+			${globalName}.Listeners[ l ].push( ${globalName}.limn );
+		}
+	}` : ""}
+}`,
+		opener = `
+var ${globalName} = {};
+
+var Limnaries = ${globalName}.Limnaries = {},
+${ usingEmitter ? `	Listeners = ${globalName}.Listeners = {},
+` : ""}	Passables = ${globalName}.Passables = {};`,
+		builds = [];
+
+	for( let name in LimnaryDefinitions ) {
+		let definition = LimnaryDefinitions[ name ],
+			factoryCode = definition.factory.toLocaleString(),
+			listen = definition.listen ?
+				( definition.listen.indexOf( "|" ) > -1 ?
+				definition.listen.split( "|" ) : [ definition.listen ] ) : false,
+			limns = {};
+		for( let localName in definition.imports )
+			limns[ localName ] = definition.imports[ localName ].replace( /\//g, "." );
+		let limnaryObject = 
+				`${globalName}.Passables[ "${name}" ] = ${JSON.stringify(limns)||"{}"}`,
+			defineObject =
+`${globalName}._( {
+	Limnaries: ${globalName}.Limnaries,
+	name: "${name}",
+	factory: ${factoryCode},
+	limnaries: ${limnaryObject},
+${ usingEmitter ? 
+`	emit: ${definition.emits?`${globalName}.e`:"false"},
+	Listeners: ${globalName}.Listeners,
+` : "" }	listen: ${listen?"[\""+listen.join('","')+"\"]":"false"}
+} );`
+		builds.push( defineObject );
+	}
+
+	let builder = 
+`( function( ${globalName} ) {
+		var Limnaries = undefined,
+${ usingEmitter ? `			Listeners = undefined,
+` : ""}			Passables = undefined;
+		${addLimnaryFunction}
+		${builds.join( "\r\n" )}
+	}
+)( ${globalName} );
+`,
+		closer = `
+${ usingEmitter ? `delete ${globalName}.Listeners;
+delete ${globalName}.e;` : "" }
+delete ${globalName}.Limnaries;
+delete ${globalName}.Passables;
+delete ${globalName}._;
+
+
+var passables,
+	name,
+	localReference;
+for( name in Passables ) {
+	passables = Passables[ name ];
+	for( localReference in passables ) {
+${ usingEmitter ? `		if( localReference === "emit" ) continue;
+		else` : "		" } passables[ localReference ] =
+			Limnaries[ passables[ localReference ] ];
+	}
+	Object.freeze( passables );
+}
+Object.freeze( Passables );
+passables = undefined;
+name = undefined;
+localReference = undefined;
+
+(
+	function( preexistingLimnaryLookup ) {
+		window.${globalName} = function( name ) {
+			return new Promise(
+				function( returnLimn ) {
+					var thisLimnary = Limnaries[ name.replace( /\\//g, "." ) ];
+					returnLimn( ( typeof preexistingLimnaryLookup === "function" ) ?
+						( thisLimnary || preexistingLimnaryLookup( name ) ) : thisLimnary );
+				}
+			);
+		}
+	}
+)( window.${globalName} );
+`;
+
+return ( noPromisePolyfill ? 
+	"" : promisePolyfill + "\r\n" ) +
+`( function( window ) {
+${[
+opener,
+emitFunction,
+builder,
+closer
+].join( "\r\n" )} 
+}
+)( window || global )
+`;
+}
+
 function BriefBuild( globalName ) {
-	let emitFunction = 
+	let usingEmitter = checkIfUsingEmit();
+	let emitFunction = usingEmitter ?
 `${globalName}.e = async ( name, detail ) => {
 	let alls = [];
 	for( let l of Listeners[ name ] ) { let v = l( name, detail ); 
 		if( v && ( typeof v.then === "function" ) ) alls.push( v ); }
 	if( alls.length > 0 ) await Promise.all( alls );
 	return true;
-}`,
+};` : "",
 		addLimnaryFunction = `${globalName}._ = 
 ( ${globalName} ) => {
 	${globalName}.method = ${globalName}.factory(),
@@ -1525,18 +1912,18 @@ function BriefBuild( globalName ) {
 		return function( ...parameters ) {
 			return ${globalName}.method.apply( this, [ ${globalName}.limnaries, ...parameters ] )
 		} } )(Object.freeze({ method: ${globalName}.method, limnaries: ${globalName}.limnaries }));
-	if( ${globalName}.emit ) ${globalName}.limnaries.emit = ${globalName}.emit;
+${ usingEmitter ? `	if( ${globalName}.emit ) ${globalName}.limnaries.emit = ${globalName}.emit;
 	if( ${globalName}.listen ) for( let l of ${globalName}.listen ) {
 		if( ! ${globalName}.Listeners[ l ] ) ${globalName}.Listeners[ l ] = [];
 		${globalName}.Listeners[ l ].push( ${globalName}.limn );
-	}
+	}` : "" }
 }`,
 		opener = `
 let ${globalName} = {};
 
-const Listeners = ${globalName}.Listeners = {},
-	Limnaries = ${globalName}.Limnaries = {},
-	Passables = ${globalName}.Passables = {};
+const Limnaries = ${globalName}.Limnaries = {},
+${ usingEmitter ? `	Listeners = ${globalName}.Listeners = {},
+` : ""}	Passables = ${globalName}.Passables = {};
 `,
 		builds = [];
 
@@ -1553,36 +1940,37 @@ const Listeners = ${globalName}.Listeners = {},
 				`${globalName}.Passables[ "${name}" ] = ${JSON.stringify(limns)||"{}"}`,
 			defineObject =
 `${globalName}._( {
-	Limnaries: ${globalName}.Limnaries, Listeners: ${globalName}.Listeners,
+	Limnaries: ${globalName}.Limnaries,
 	name: "${name}",
 	factory: ${factoryCode},
 	limnaries: ${limnaryObject},
-	emit: ${definition.emits?`${globalName}.e`:"false"},
-	listen: ${listen?"[\""+listen.join('","')+"\"]":"false"}
+${ usingEmitter ? `	emit: ${definition.emits?`${globalName}.e`:"false"},
+	Listeners: ${globalName}.Listeners,
+` : ""}	listen: ${listen?"[\""+listen.join('","')+"\"]":"false"}
 } );`
 		builds.push( defineObject );
 	}
 
 	let builder = `
 ( ( ${globalName} ) => {
-const Listeners = undefined,
-	Limnaries = undefined,
-	Passables = undefined;
+const Limnaries = undefined,
+${ usingEmitter ? `	Listeners = undefined,
+` : ""}	Passables = undefined;
 ${addLimnaryFunction}
 ${builds.join( "\r\n" )}
 } )( ${globalName} )
-`;
+`,
 		closer = `
-delete ${globalName}.Listeners;
-delete ${globalName}.Limnaries;
+${ usingEmitter ? `delete ${globalName}.Listeners;
+delete ${globalName}.e;
+` : ""}delete ${globalName}.Limnaries;
 delete ${globalName}.Passables;
 delete ${globalName}._;
-delete ${globalName}.e;
 for( let name in Passables ) {
 	let passables = Passables[ name ];
 	for( let localReference in passables ) {
-		if( localReference === "emit" ) continue;
-		passables[ localReference ] =
+${ usingEmitter ? `		if( localReference === "emit" ) continue;
+` : ""}		passables[ localReference ] =
 			Limnaries[ passables[ localReference ] ];
 	}
 	Object.freeze( passables );
@@ -1805,7 +2193,8 @@ ${[
 			links.outlines[ name ] = links.outlines[ name ] || makeOutline();
 
 			let def = null;
-			if( name.indexOf( "()*" ) === name.length - 3 ) {
+			if( name.length > 3 &&
+				name.indexOf( "()*" ) === name.length - 3 ) {
 				def = outlines[ name ];
 			}
 			else if( name.indexOf( "*" ) === -1 ) {
@@ -2002,8 +2391,8 @@ ${[
 				for( let l of links )
 					staticLinks.push( l );
 				for( let l of staticLinks ) {
-					let id = l.innerText,
-						sum = getDetail( id );
+					let id = l.innerHTML.replace( /<em>.+<\/em>/g, "" ),
+						sum = getDetail( id.replace( /"/g, "" ) );
 					if( ! sum ) continue;
 					let detail = make( "span" );
 					l.classList.add( "detailHolder" );
@@ -2370,7 +2759,7 @@ ${[
 					else if( fullName && fullName.category === "limnary" ) {
 						fullName = fullName.fullName;
 						let liSummaryLabel = make( "span" ),
-							summary = getSummary( fullName );
+							summary = getDetail( fullName );
 						liLabel.classList.add( "detailHolder" );
 						liLabel.classList.add( "horizontal" );
 						liSummaryLabel.innerHTML = summary;
@@ -2567,7 +2956,7 @@ ${[
 		let buildVersioner = make( "input" );
 			buildVersioner.setAttribute( "type", "text" );
 			buildVersioner.setAttribute( "placeholder", "version" );
-			buildVersioner.setAttribute( "value", "0" );
+			buildVersioner.setAttribute( "value", buildVersion );
 			write( "Build Version: " ).to( buildPanel );
 			add( buildVersioner ).to( buildPanel );
 
@@ -2584,7 +2973,9 @@ ${[
 			let name = buildNamer.value || "untitled",
 				version = buildVersioner.value || "0",
 				globalName = buildGlobalizer.value || LimnAlias,
-				fileText = BriefBuild( globalName ), //build the limnaries! :-)
+				fileText = useArchaicJS ?
+					ArchaicBuild( globalName ) :
+					BriefBuild( globalName ), //build the limnaries! :-)
 				blob = new Blob( [ fileText ], { type: "text/application-x" } ),
 				fileName = `${name}.${version}.js`;
 
@@ -2637,6 +3028,7 @@ ${[
 		--colored-text-primary-dark:rgb(0,45,135);
 		--colored-text-secondary:rgb(100,0,0);
 		--colored-text-tertiary:rgb(0,110,30);
+		--colored-text-quaternary:rgb(255,45,0);
 		--colored-text-highlight:rgb(255,240,30);
 	
 		--light-link:var(--colored-text-primary-dark);
@@ -2984,6 +3376,15 @@ ${[
 		font-style:italic;
 		display:inline-block;
 		margin:0 0.25rem;
+	}
+	.limn-explore .summary em,
+	.limn-explore .detail em {
+		color: var(--colored-text-quaternary);
+		font-weight:400;
+		font-style:italic;
+		display:inline-block;
+		margin:0 0.25rem;
+		white-space:nowrap;
 	}
 	.limn-explore .summary span,
 	.limn-explore .detail span {

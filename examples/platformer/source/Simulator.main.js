@@ -19,7 +19,7 @@ platformer( "Simulator.main", {
                 simulatorTimestep = getConfig().simulatorTimestep;
 
             while( state.deltaTime > simulatorTimestep ) {
-                jump(  );
+                jump( simulatorTimestep );
                 strafe( simulatorTimestep );
                 fall( simulatorTimestep );
                 move( simulatorTimestep );

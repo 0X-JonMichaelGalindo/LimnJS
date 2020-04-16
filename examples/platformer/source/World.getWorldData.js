@@ -3,7 +3,7 @@ platformer.Outline( "World.Types.platform*", {
     "w":"number", "h":"number"
 } );
 platformer.Outline( "World.Types.world*", {
-    platforms: [ "World.Types.platform*" ]
+    platforms: [ "World.Types.platform*", "..." ]
 } );
 
 platformer( "World.getWorldData", {

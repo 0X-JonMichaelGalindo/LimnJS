@@ -4,7 +4,7 @@ boxes.Outline( "Data.box*",
 );
 
 boxes.Outline( "Data.boxData*", {
-    "boxes": [ "Data.box*" ],
+    "boxes": [ "Data.box*", "..." ],
     "scale": {
         "x": "number",
         "y": "number",

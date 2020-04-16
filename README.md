@@ -41,7 +41,8 @@ It's the best of all worlds:
         9. [Familiar Primitive Imitation](#familiar-primitive-imitation)
         10. [Object Template Outlines](#object-template-outlines)
         11. [Documented Function Outlines](#documented-function-outlines)
-        12. [Array Template Outlines](#array-template-outlines)
+        12. [Array Outlines](#array-outlines)
+        13. [Array Template Outlines: The Etcetera Operator](#array-template-outlines:-the-etcetera-operator-(...))
     3. [Listeners](#listeners)
 6. [Video Tutorial (Not Available!)](#video-tutorial-not-available)
 7. [Background and Trivia](#background-and-trivia)
@@ -103,7 +104,7 @@ Because it is still so young, LimnJS's interface could change.
 ## How Long is Beta?
 
 For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
-- Core features
+- ~~Core features~~
   - ~~load source~~
   - ~~multi-import (separate source directories)~~
   - ~~limns imports~~
@@ -122,6 +123,8 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
     - ~~spec adherence test~~
     - ~~parameter trap error catching~~
     - ~~return trap error catching~~
+    - ~~safe recursion / identity~~
+    - ~~etcetera op array templates~~
   - ~~analyze source~~
     - ~~dot-hierarchy tree~~
     - ~~quick-previews~~
@@ -148,15 +151,19 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
       - ~~HTML/CSS recursive graph layout~~
       - ~~upstream dependencies graph~~
       - ~~downstream dependencies graph~~
-  - interface
+  - ~~interface~~
     - ~~exportable modules~~
-    - redeclarable global
-  - build
+    - ~~script tag config~~
+    - ~~redeclarable global~~
+      - ~~in LimnJS~~
+      - ~~in build~~
+      - ~~in archaic build~~
+  - ~~build~~
     - ~~LimnJS independence~~
     - ~~stable~~
     - ~~reduce overhead size~~
-    - exclude event manager when unused
-    - backward-compatible build variant
+    - ~~exclude event manager when unused~~
+    - ~~backward-compatible build variant~~
 - ~~Usage documentation in README~~
   - ~~installation~~
   - ~~basic workflow~~
@@ -176,6 +183,8 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
     - ~~function outlines~~
     - ~~array template outlines~~
   - ~~listeners~~
+  - source load flags
+    - use-archaic, globalizer, etc.
   - ~~friendliness~~
     - ~~screenshots~~
     - ~~remove const and ilk (or link to MDN)~~
@@ -990,7 +999,7 @@ LimnJS modules can use functions as parameters and returns:
 MyApp( "pickFunction", {
     parameters: [ "info:any" ],
     returns: "function",
-    factory: () => { return () => {} }
+    ...
 } )
 ```  
 When you preview "pickFunction" in LimnJS's documentation explorer, it will look like this:  
@@ -1008,14 +1017,14 @@ MyApp.Outline( "someFunction()*", {
 MyApp( "pickFunction", {
     parameters: [ "info:any" ],
     returns: "someFunction()*",
-    factory: () => { return () => {} }
+    ...
 } )
 ```  
 Now our documentation gives us a preview of what pickFunction returns:  
 
 ![Return a generic function](documentation/img/return-documented-function.png)
 
-### Array Template Outlines
+### Array Outlines
 
 Using the "array" primitive in an outline will fit any array:
 ```javascript
@@ -1023,21 +1032,43 @@ MyProjectName.Outline( "itsAnArray*", "array" )
 ```  
 `[2,true,"hi"]` will fit `"itsAnArray*"`. Any array will.
 
-An outline defined as an array of a name will fit an array full of objects that fit that name:
+An array outline with one or more names will fit an array whose entries fit those names, in order.
+
+With one name:
 ```javascript
-MyProjectName.Outline( "arrayOfStrings*", [ "string" ] )
+MyProjectName.Outline( "oneStringArray*", [ "string" ] )
+```  
+`[ "hi" ]` will fit `"oneStringArray*"`.  
+`[ "hi", "there" ]` will not fit `"oneStringArray*"`. A fitting array must contain exactly 1 string.
+
+With multiple names:
+```javascript
+MyProjectName.Outline( "str-num*", [ "string", "number" ] )
+```  
+`[ "hi", 7 ]` will fit `"str-num*"`.  
+`[ 7, "No" ]` will not fit `"str-num*"`. A fitting array must contain 1 string, then 1 number.  
+`[ "hi", 7, "no" ]` will not fit `"str-num*"`. A fitting array must contain 1 string, then 1 number. Nothing else.
+
+### Array Template Outlines: The Etcetera Operator (...)
+
+An outline array ending with the etcetera operator (`"..."`) is an array template.
+
+With 1 type, an array template fits an array full of that type.
+```javascript
+MyProjectName.Outline( "arrayOfStrings*", [ "string", "..." ] )
 ```  
 The array `["hi","there","everyone"]` will fit "arrayOfStrings*".  
 `[1,2,3]` will not, and `[1,"hi",3]` will not.  
-The array must contain only strings.
+Only an array full of strings will fit `"arrayOfStrings*"`.
 
-
-Using multiple names creates an array template:
+Multiple names followed by the etcetera operator (`"..."`) make an array template fitting an array whose types fit that pattern:
 ```javascript
-MyProjectName.Outline( "numStrBool*", [ "number", "string", "boolean" ] )
+MyProjectName.Outline( "numStrBool*", [ "number", "string", "boolean", "..." ] )
 ```  
-Will fit any array that repeats that exact pattern 0 or more times.  
-`[ 1,"hi",false ]` will fit and `[]` will fit and `[ 2,"yes",true, 3,"no",false ]` will fit.  
+Will fit any array that repeats the pattern `number,string,boolean` 0 or more times.  
+`[]` will fit. (Repeats 0 times).  
+`[ 1,"hi",false ]` will fit. (Repeats 1 time).  
+And `[ 2,"yes",true, 3,"no",false ]` will fit. (Repeats 2 times).  
 `[ 2,"yes" ]` will not fit. It lacks the pattern's "boolean" entry.  
 `[ 7,"a",true, 22,"k" ]` will not fit, for the same reason.
 
@@ -1055,13 +1086,13 @@ Listeners trigger on those events, receiving the single object passed by the emi
 Here is an example of an outline, emitter, and listener.
 ```javascript
 //define an outline to emit
-Limn.Outline( 
+MyApp.Outline( 
     "Events.eventTypeA*",
     { "info": "string" }
 );
 //...
 //emit it from one of your limns
-Limn( "Something.act", {
+MyApp( "Something.act", {
     //...
     emits: "Events.eventTypeA*",
     //...
@@ -1079,7 +1110,7 @@ Limn( "Something.act", {
 } );
 //...
 //listen for that event and react to it.
-Limn( "Stuff.Listeners.listenForIt", {
+MyApp( "Stuff.Listeners.listenForIt", {
     listens: "Events.eventTypeA*",
     factory: function() {
         //...
@@ -1095,8 +1126,9 @@ You can use events synchronously or asyncronously.
 imports.emit( "Something.EventType*", "" );
 //^Listeners will react to this after the current code block finishes.
 
+//(using JavaScript async/await syntax):
 await imports.emit( "Something.EventType*", "" );
-//^All listeners will finish firing before this block continues its code.
+//^All listeners will finish executing before this block continues executing.
 ```  
 (The code above uses JavaScript async/await syntax. You can read about async/await on [MDN](https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Asynchronous/Async_await))
 
