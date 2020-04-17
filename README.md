@@ -42,7 +42,7 @@ It's the best of all worlds:
         10. [Object Template Outlines](#object-template-outlines)
         11. [Documented Function Outlines](#documented-function-outlines)
         12. [Array Outlines](#array-outlines)
-        13. [Array Template Outlines: The Etcetera Operator](#array-template-outlines:-the-etcetera-operator-(...))
+        13. [Array Template Outlines](#array-template-outlines)
     3. [Listeners](#listeners)
 6. [Video Tutorial (Not Available!)](#video-tutorial-not-available)
 7. [Background and Trivia](#background-and-trivia)
@@ -104,7 +104,7 @@ Because it is still so young, LimnJS's interface could change.
 ## How Long is Beta?
 
 For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
-- ~~Core features~~
+- Core features
   - ~~load source~~
   - ~~multi-import (separate source directories)~~
   - ~~limns imports~~
@@ -133,6 +133,7 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
       - ~~object outlines~~
       - ~~function outlines~~
       - ~~array template outlines~~
+      - ~~identities~~
     - ~~resource extraction~~
       - ~~name~~
       - ~~function parameters~~
@@ -151,9 +152,10 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
       - ~~HTML/CSS recursive graph layout~~
       - ~~upstream dependencies graph~~
       - ~~downstream dependencies graph~~
-  - ~~interface~~
+  - interface
     - ~~exportable modules~~
     - ~~script tag config~~
+        - no build event
     - ~~redeclarable global~~
       - ~~in LimnJS~~
       - ~~in build~~
@@ -183,8 +185,6 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
     - ~~function outlines~~
     - ~~array template outlines~~
   - ~~listeners~~
-  - source load flags
-    - use-archaic, globalizer, etc.
   - ~~friendliness~~
     - ~~screenshots~~
     - ~~remove const and ilk (or link to MDN)~~
@@ -215,10 +215,29 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
   - color dynamic data strings
   - example code in every error
 - Exhaustive documentation
-  - script import behavior
-  - module definitions
-  - outline definitions
-  - outline fitting behavior
+  - limn.js
+    - ~~Load and Configure LimnJS~~
+        - ~~Source-Directory Flag~~
+        - ~~Global-Name Flag~~
+        - ~~Build-Version Flag~~
+        - ~~Use-Archaic-JS Flag~~
+        - ~~No-Promise-Polyfill Flag~~
+    - ~~The Global Limn Object~~
+        - ~~Limn~~
+        - ~~Limn.Outline~~
+        - ~~Limn.Explore~~
+    - Advanced
+        - ~~Build-Global Flag~~
+            - ~~3 Requirements~~
+                - ~~Requirement 1: Global Name~~
+                - ~~Requirement 2: Load Event~~
+                - ~~Requirement 3: Master Module~~
+            - ~~Master Module Example~~
+        - No-Build-Event Flag
+  - explorer
+  - modules
+  - outlines
+    - ~~identity~~
 
 # Get Up and Running
 1. To get started on a LimnJS codebase, download LimnJS to a new project directory.  
@@ -349,7 +368,7 @@ Becomes during development:
 We preview and debug our source code directly in the browser.  
 Thanks to LimnJS, we have type checking, dependency graphs, and beautiful auto-documentation, right alongside our browser console and our app.  
 
-So, what goes inside the "source/fetch" and "source/graph" folders mentioned above?
+In the [building with LimnJS](#building-with-limnjs) section, we'll look at what goes inside the "source/fetch" and "source/graph" folders mentioned above.
 
 # Examples
 There are two examples at the moment:  
@@ -439,6 +458,7 @@ LimnJS uses [modules](#modules), *[outlines](#outlines), and *[listeners](#liste
 *\*Well, only if you want. Only modules are required.*
 
 ## Modules
+
 LimnJS Modules are well-documented functions.  
 
 They are created by a factory function, then stored by LimnJS's module manager until requested by another module or by external code.  
@@ -1049,7 +1069,7 @@ MyProjectName.Outline( "str-num*", [ "string", "number" ] )
 `[ 7, "No" ]` will not fit `"str-num*"`. A fitting array must contain 1 string, then 1 number.  
 `[ "hi", 7, "no" ]` will not fit `"str-num*"`. A fitting array must contain 1 string, then 1 number. Nothing else.
 
-### Array Template Outlines: The Etcetera Operator (...)
+### Array Template Outlines
 
 An outline array ending with the etcetera operator (`"..."`) is an array template.
 

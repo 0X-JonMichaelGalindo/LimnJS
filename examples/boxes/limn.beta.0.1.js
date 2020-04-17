@@ -58,10 +58,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		*/
 		ListenersForParsing = {},
 		LimnAlias = "Limn",
+		LimnOverwritten = false,
 		limnDirectory = null,
 		buildVersion = 0,
 		useArchaicJS = false,
-		noPromisePolyfill = false;
+		noPromisePolyfill = false,
+		useGlobalizer = false;
 
 	var illegalNameCharacters = /[^/\w\d_\-.]|\.\./gi,
 		illegalOutlineCharacters = /[^/\w\d_\-.*()|]|\.\./gi,
@@ -82,7 +84,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 						conflict = s.getAttribute( "conflicting-names" ),
 						version = s.getAttribute( "build-version" ),
 						archaic = s.getAttribute( "use-archaic-js" ),
-						noPromise = s.getAttribute( "no-promise-polyfill" );
+						noPromise = s.getAttribute( "no-promise-polyfill" ),
+						rebuildGlobal = s.getAttribute( "build-global" );
 						
 					if( archaic && archaic.toLowerCase() === "false" )
 						archaic = false;
@@ -97,7 +100,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 						loaded: loaded || false,
 						version: version,
 						archaic: archaic,
-						noPromise: noPromise
+						noPromise: noPromise,
+						rebuildGlobal: rebuildGlobal
 					} );
 				}
 			}
@@ -152,7 +156,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		}
 	}
 	function becomeLimn( info ) {
-		const { node, directory, globalName, version, archaic, noPromise } = info;
+		const { node, directory, globalName, 
+			version, archaic, noPromise,
+			rebuildGlobal } = info;
 		if( directory ) {
 			let illegalMatch = directory.match( illegalDirectoryCharacters );
 			if( illegalMatch !== null ) {
@@ -170,6 +176,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		if( version ) buildVersion = version;
 		if( archaic ) useArchaicJS = true;
 		if( noPromise ) noPromisePolyfill = true;
+		if( rebuildGlobal ) useGlobalizer = true;
 		node.setAttribute( "finished-loading", "true" );
 	}
 	let nextLimn = getNextWaitingLimn();
@@ -182,7 +189,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 
 	function load( name ) {
 		name = name.replace( /\//g, "." );
-		let s = document.body.appendChild( document.createElement( "script" ) ),
+		let s = document.head.appendChild( document.createElement( "script" ) ),
 			lName = LiteralNames[ name ];
 		s.src = ( limnDirectory ? limnDirectory + "/" : "" ) + lName + ".js";
 		
@@ -217,8 +224,16 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		return new Promise( ( resolve ) => {
 			var travelingResolver = function() {
 				let readyOrName = checkReady( name );
-				if( readyOrName === true )
+				if( readyOrName === true ) {
+					if( name === LimnAlias && 
+						useGlobalizer &&
+						LimnOverwritten === false ) {
+						let newGlobal = Limnaries[ name ]( window[ LimnAlias ] );
+						window[ LimnAlias ] = newGlobal;
+						LimnOverwritten = true;
+					}
 					resolve( Limnaries[ name ] );
+				}
 				else {
 					if( readyOrName === name )
 						loadIfNecessary( name );
@@ -1783,7 +1798,7 @@ function( ${globalName} ) {
 	${globalName}.method = ${globalName}.factory();
 	${globalName}.limn = ${globalName}.Limnaries[ ${globalName}.name ] =
 	( function( ${globalName} ) { return function() {
-		var newArgs = [ test.limnaries ];
+		var newArgs = [ ${globalName}.limnaries ];
 		for( var i = 0; i < arguments.length; i ++ )
 			newArgs.push( arguments[ i ] );
 		return ${globalName}.method.apply( this, newArgs );
@@ -1879,7 +1894,35 @@ localReference = undefined;
 		}
 	}
 )( window.${globalName} );
-`;
+`,
+		globalizer = useGlobalizer ?
+`( function( currentGlobal ) {
+	var newGlobal = Limnaries[ 
+			( "${globalName}" ).replace( /\\//g, "." )
+		]( currentGlobal );
+	window.${globalName} = newGlobal;
+	var event = document.createEvent( "Event" );
+	event.initEvent( "${globalName}", true, true );
+	window.dispatchEvent( event );
+} )( window.${globalName} );
+` : "";
+
+/*
+Emitting in old IE:
+// Create the event.
+var event = document.createEvent('Event');
+
+// Define that the event name is 'build'.
+event.initEvent('build', true, true);
+
+// Listen for the event.
+elem.addEventListener('build', function (e) {
+  // e.target matches elem
+}, false);
+
+// target can be any Element or other EventTarget.
+elem.dispatchEvent(event);
+*/
 
 return ( noPromisePolyfill ? 
 	"" : promisePolyfill + "\r\n" ) +
@@ -1888,7 +1931,8 @@ ${[
 opener,
 emitFunction,
 builder,
-closer
+closer,
+globalizer
 ].join( "\r\n" )} 
 }
 )( window || global )
@@ -1983,15 +2027,24 @@ Object.freeze( Passables );
 		return ( typeof preexistingLimnaryLookup === "function" ) ?
 			( thisLimnary || preexistingLimnaryLookup( name ) ) : thisLimnary;
 	}
-} )( window.${globalName} )
-`;
+} )( window.${globalName} );
+`,
+		globalizer = useGlobalizer ?
+`
+( ( currentGlobal ) => {
+	let newGlobal = Limnaries[ ( "${globalName}" ).replace( /\\//g, "." ) ]( currentGlobal );
+	window.${globalName} = newGlobal;
+	window.dispatchEvent( new Event( "${globalName}" ) );
+} )( window.${globalName} );
+` : "";
 
 	return `( ( window )=> {
 ${[
 	opener,
 	emitFunction,
 	builder,
-	closer
+	closer,
+	globalizer
 	].join( "\r\n" )} 
 } )( window || global )`;
 }
@@ -3006,6 +3059,13 @@ ${[
 		if( focus ) {
 			elementsByName[ focus ].tabElement.onclick();
 		}
+	}
+
+	if( useGlobalizer ) {
+		( async () => {
+			await Limn( LimnAlias );
+			window.dispatchEvent( new Event( LimnAlias ) );
+		} )();
 	}
 
 	/* Yes... this is a css file in a js file. :-/
