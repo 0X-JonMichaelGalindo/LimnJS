@@ -1,0 +1,23 @@
+<html>
+    <head>
+        <title>Hello World - A LimnJS Example</title>
+        <!--script src="limn.beta.0.1.js"
+            global-name="Hello"
+            source-directory="source"
+        ></script-->
+        <script src="Hello.0.js"></script>
+        <script>
+            window.onload = function() {
+                Hello( "hello-world" ).then(
+                    function( helloMethod ) {
+                        helloMethod( "LimnJS" );
+
+                        //Hello.Explore( document.body, "hello-world" );
+                    }
+                );
+
+            }
+        </script>
+    </head>
+    <body></body>
+</html>

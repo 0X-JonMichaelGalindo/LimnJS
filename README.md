@@ -189,11 +189,10 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
     - ~~screenshots~~
     - ~~remove const and ilk (or link to MDN)~~
 - Video Tutorial in README
-- Examples ~~(at least 2)~~ in README
-  - is two enough?
-    - ~~boxes~~
-    - ~~platformer~~
-    - another?
+- ~~Examples in README~~
+  - ~~hello world~~
+  - ~~boxes~~
+  - ~~platformer~~
 - ~~Other Info in README?~~
   - ~~Name~~
   - ~~Outline inspiration~~
@@ -208,8 +207,8 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
   - save expansion state to local storage
   - hide menu in portrait mode
   - touch-friendly interface
-    - info bullet buttons
-      - portrait mode (hide menu)
+    - ~~info bullet buttons~~
+    - portrait mode (hide menu)
 - Style console error output
   - line-break objects or keep at eol 
   - color dynamic data strings

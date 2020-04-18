@@ -2450,8 +2450,15 @@ ${[
 					let detail = make( "span" );
 					l.classList.add( "detailHolder" );
 					l.classList.add( "vertical" );
-					l.onclick = () => {
-						elementsByName[ id ].tabElement.onclick();
+					l.onclick = e => {
+						if( l.getClientRects()[ 0 ].width > e.offsetX )
+							elementsByName[ id ].tabElement.onclick();
+						else {
+							if( e.preventDefault )
+								e.preventDefault();
+							if( e.stopPropagation )
+								e.stopPropagation();
+						}
 					}
 					detail.innerHTML = sum;
 					detail.classList.add( "detail" );
@@ -2514,8 +2521,15 @@ ${[
 						add( fullLabel ).to( supportLi );
 						if( localMessage && localMessage.asSuffix )
 							add( localLabel ).to( supportLi );
-						supportLi.onclick = () => {
-							elementsByName[ supportedName ].tabElement.onclick();
+						supportLi.onclick = e => {
+							if( fullLabel.getClientRects()[ 0 ].width > e.offsetX )
+								elementsByName[ supportedName ].tabElement.onclick();
+							else {
+								if( e.preventDefault )
+									e.preventDefault();
+								if( e.stopPropagation )
+									e.stopPropagation();
+							}
 						}
 						add( supportLi ).to( supportsEl );
 					}
@@ -2587,6 +2601,10 @@ ${[
 					c.classList.remove( "lit" );
 			},
 			makeCell = ( name, graphStack ) => {
+				/*
+					TODO: In a few years, when hardware is more powerful,
+					make these detail holders.
+				*/
 				let cell = make( "div" ),
 					intruder = make( "div" ),
 					placard = make( "div" ),
@@ -2703,7 +2721,16 @@ ${[
 						outlineTab.id = "tab-link:" + fullName;
 						elementsByName[ fullName ].tabElement = outlineTab;
 
-						liLabel.onclick = () => { outlineTab.onclick(); }
+						liLabel.onclick = e => {
+							if( liLabel.getClientRects()[ 0 ].width > e.offsetX )
+								outlineTab.onclick();
+							else {
+								if( e.preventDefault )
+									e.preventDefault();
+								if( e.stopPropagation )
+									e.stopPropagation();
+							}
+						}
 
 						let nameBanner = make( "div" );
 						nameBanner.classList.add( "name" );
@@ -2844,7 +2871,16 @@ ${[
 						methodTab.id = "tab-link:" + fullName;
 						elementsByName[ fullName ].tabElement = methodTab;
 
-						liLabel.onclick = () => { methodTab.onclick(); }
+						liLabel.onclick = e => {
+							if( liLabel.getClientRects()[ 0 ].width > e.offsetX )
+								methodTab.onclick();
+							else {
+								if( e.preventDefault )
+									e.preventDefault();
+								if( e.stopPropagation )
+									e.stopPropagation();
+							}
+						}
 						if( LimnaryDefinitions[ fullName ].done )
 							liLabel.classList.add( "done" );
 						else if( LimnaryDefinitions[ fullName ].notDone )
@@ -3375,19 +3411,17 @@ ${[
 		cursor:pointer;
 		position:relative;
 		text-decoration: underline solid var(--colored-text-primary-dark);
-		/*border-bottom:1px dashed var(--colored-text-primary-dark);*/
+		margin-right:1.8rem !important;
 	}
 	.limn-explore .detailHolder.primitive:hover,
 	.limn-explore .detailHolder.primitive {
 		cursor:default;
 		color:var(--normal-text-color);
 		text-decoration: none;
-		/*border-bottom:0;*/
 	}
 	.limn-explore .detailHolder:hover {
 		color:var(--colored-text-primary);
 		text-decoration: underline var(--colored-text-primary);
-		/*border-bottom:1px dashed var(--colored-text-primary);*/
 	}
 	.limn-explore .summary {
 		color:var(--normal-text-color);
@@ -3456,6 +3490,44 @@ ${[
 		display:block !important;
 		position:absolute;
 		z-index:10000000;
+	}
+	.limn-explore .detailHolder.horizontal:before,
+	.limn-explore .detailHolder.vertical:before {
+		content:' ';
+		border:1px solid var(--colored-text-primary-dark);
+		border-radius:0.625rem;
+		border-bottom-left-radius:0;
+		transform:rotate(45deg);
+	}
+	.limn-explore .detailHolder.horizontal:before,
+	.limn-explore .detailHolder.horizontal:after {
+		top:0.05rem !important;
+		height:1.125rem;
+		width:1.125rem;
+	}
+	.limn-explore .detailHolder.horizontal:after,
+	.limn-explore .detailHolder.vertical:after {
+		content:'i';
+		right:-1.7rem !important;
+		font-size:1rem;
+	}
+	.limn-explore .detailHolder.horizontal:before,
+	.limn-explore .detailHolder.horizontal:after,
+	.limn-explore .detailHolder.vertical:before,
+	.limn-explore .detailHolder.vertical:after {
+		font-style:italic;
+		text-decoration:none;
+		display:flex;
+		flex-direction:column;
+		justify-content:center;
+		align-items:center;
+		height:1.25rem;
+		width:1.25rem;
+		color:black;
+		position:absolute;
+		right:-1.8rem;
+		top:-0rem;
+		color:var(--colored-text-primary-dark);
 	}
 	.limn-explore .detailHolder.vertical:hover > .detail {
 		top:110%;
