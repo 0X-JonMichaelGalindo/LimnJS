@@ -8,7 +8,7 @@ platformer( "Simulator.strafe", {
 		"t:number"
 	],
 	factory: () => {
-		return ( imports, t ) => {
+		return t => {
 			const { getConfig, getKeyStates, getChar } = imports,
 				config = getConfig(),
 				keys = getKeyStates(),

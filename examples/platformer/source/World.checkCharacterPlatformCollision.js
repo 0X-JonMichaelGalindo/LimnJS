@@ -12,7 +12,7 @@ platformer( "World.checkCharacterPlatformCollision", {
 	},
 	returns: "World.Types.hitTest*",
 	factory: () => {
-		return imports => {
+		return () => {
 			const { getScreen, getConfig, getWorld, getChar } = imports,
 				screenHeight = getScreen().h,
 				config = getConfig(),

@@ -8,7 +8,7 @@ platformer( "Simulator.fall", {
 		"t:number"
 	],
 	factory: () => {
-		return ( imports, t ) => {
+		return t => {
 			const { getConfig, getChar, hit } = imports,
 				config = getConfig(),
 				char = getChar(),

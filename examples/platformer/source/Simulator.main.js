@@ -11,7 +11,7 @@ platformer( "Simulator.main", {
         "keepInScreen": "Simulator.keepCharacterOnScreen",
     },
     factory: () => {
-        return imports => {
+        return () => {
             const { getState, getConfig, 
                     jump, strafe, fall, frict, move,
                     keepInScreen } = imports,

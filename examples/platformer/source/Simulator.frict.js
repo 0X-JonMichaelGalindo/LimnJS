@@ -6,7 +6,7 @@ platformer( "Simulator.frict", {
     },
     parameters:[ "t:number" ],
     factory: () => {
-        return ( imports, t ) => {
+        return t => {
             const { getConfig, getChar, checkHit } = imports,
                 config = getConfig(),
                 char = getChar(),

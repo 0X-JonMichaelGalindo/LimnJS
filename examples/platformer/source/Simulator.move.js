@@ -6,7 +6,7 @@ platformer( "Simulator.move", {
         "t:number",
     ],
     factory: () => {
-        return ( imports, t ) => {
+        return t => {
             const { getChar } = imports,
                 char = getChar();
             char.x += char.v.x * t;

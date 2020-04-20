@@ -9,7 +9,7 @@ platformer( "Simulator.jump", {
 		"t:number"
     ],
 	factory: () => {
-		return ( imports, t ) => {
+		return t => {
 			const { getConfig, getKeyStates, getChar, checkHit } = imports,
 				config = getConfig(),
 				keys = getKeyStates(),

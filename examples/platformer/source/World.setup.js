@@ -5,7 +5,7 @@ platformer( "World.setup", {
         "getCharacter": "World.getCharacterData",
     },
     factory: () => {
-        return ( imports ) => {
+        return () => {
             const { getScreen, getWorld, getCharacter } = imports;
             let screen = getScreen(),
                 w = screen.w,

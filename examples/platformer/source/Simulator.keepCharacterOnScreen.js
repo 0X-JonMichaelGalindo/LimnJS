@@ -4,7 +4,7 @@ platformer( "Simulator.keepCharacterOnScreen", {
         "getScreen": "Canvas.getCanvasContext"
     },
     factory: () => {
-        return imports => {
+        return () => {
             const { getChar, getScreen } = imports,
                 char = getChar(),
                 screen = getScreen();
