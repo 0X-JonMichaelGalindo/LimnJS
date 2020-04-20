@@ -4,7 +4,7 @@ platformer( "IO.updateTime", {
     },
     parameters: [ "t:number" ],
     factory: () => {
-        return ( imports, t ) => {
+        return t => {
             const { getState } = imports,
                 state = getState();
             if( state.time === null )

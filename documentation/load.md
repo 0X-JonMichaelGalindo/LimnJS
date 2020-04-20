@@ -15,6 +15,7 @@ Use this library to import, develop, and build your site, webapp, or JavaScript 
     1. [Limn](#limn)
     2. [Limn.Outline](#limn.outline)
     3. [Limn.Explore](#limn.explore)
+    4. [Limn.source](#limn.source)
 3. [Advanced](#advanced)
     1. [Build-Global Flag](#build-global-flag)
         1. [3 Requirements](#3-requirements)
@@ -300,6 +301,20 @@ Open the LimnJS code explorer either from the browser console or from your index
 
 Learn about the code explorer in-depth at the [explorer documentation](explorer.md).
 
+## Limn.source
+
+Boolean: True in development mode, attribute not set in deployment mode.
+
+The global limn object has an attribute unique to development mode.  
+This allows your apps to test whether a particular global limn object has been imported from limn.js, or is created by a stand-alone compiled library.  
+```javascript
+if( Limn.source ) {
+    ...
+}
+```
+
+You might use this, for example, when replacing the global limn object (see the [build-global flag](#build-global-flag)), to expose the global limn object only during development.
+
 # Advanced
 
 Most of the time, you will not need these features, so I moved them to this "advanced" section.  
@@ -461,8 +476,6 @@ In that case, you would not need to create anything on the global scope.
 Your master module method could simply return `undefined`.
 
 ## No-Build-Event Flag
-
-(This flag is not implemented yet. Specifying it will do nothing.)
 
 ```html
 <script src="limn.beta.0.1.js"

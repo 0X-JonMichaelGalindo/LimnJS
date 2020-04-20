@@ -4,7 +4,7 @@ platformer( "IO.EventHandlers.recordKeyState", {
         "getKeyStates": "IO.getKeyStates"
     },
     factory: () => {
-        return ( imports, eventName, eventDetail ) => {
+        return ( eventName, eventDetail ) => {
             imports.getKeyStates()[ eventDetail.keyName ] = eventDetail.state;
         }
     }

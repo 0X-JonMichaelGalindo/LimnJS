@@ -5,7 +5,7 @@ platformer( "Canvas.drawWorld", {
         "getCanvas": "Canvas.getCanvasContext",
     },
     factory: () => {
-        return ( imports ) => {
+        return () => {
             const { getWorld, getCharacter, getCanvas } = imports,
                 { cnv, ctx, w, h } = getCanvas(),
                 { platforms } = getWorld();

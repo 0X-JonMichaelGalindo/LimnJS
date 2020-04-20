@@ -4,6 +4,6 @@ platformer( "IO.getKeyStates", {
     },
     returns: "IO.Types.keyStates*",
     factory: () => {
-        return imports => imports.getGameState().keyStates;
+        return () => imports.getGameState().keyStates;
     }
 } )

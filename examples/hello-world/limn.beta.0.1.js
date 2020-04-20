@@ -63,7 +63,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		buildVersion = 0,
 		useArchaicJS = false,
 		noPromisePolyfill = false,
-		useGlobalizer = false;
+		useGlobalizer = false,
+		noBuildEvent = false;
 
 	var illegalNameCharacters = /[^/\w\d_\-.]|\.\./gi,
 		illegalOutlineCharacters = /[^/\w\d_\-.*()|]|\.\./gi,
@@ -85,12 +86,15 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 						version = s.getAttribute( "build-version" ),
 						archaic = s.getAttribute( "use-archaic-js" ),
 						noPromise = s.getAttribute( "no-promise-polyfill" ),
-						rebuildGlobal = s.getAttribute( "build-global" );
+						rebuildGlobal = s.getAttribute( "build-global" ),
+						noEvent = s.getAttribute( "no-build-event" );
 						
 					if( archaic && archaic.toLowerCase() === "false" )
 						archaic = false;
 					if( noPromise && noPromise.toLowerCase() === "false" )
 						noPromise = false;
+					if( noEvent && noEvent.toLowerCase() === "false" )
+						noEvent = false;
 
 					if( conflict ) continue;
 					else allLimns.push( {
@@ -101,7 +105,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 						version: version,
 						archaic: archaic,
 						noPromise: noPromise,
-						rebuildGlobal: rebuildGlobal
+						rebuildGlobal: rebuildGlobal,
+						noEvent: noEvent
 					} );
 				}
 			}
@@ -158,7 +163,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 	function becomeLimn( info ) {
 		const { node, directory, globalName, 
 			version, archaic, noPromise,
-			rebuildGlobal } = info;
+			rebuildGlobal, noEvent } = info;
 		if( directory ) {
 			let illegalMatch = directory.match( illegalDirectoryCharacters );
 			if( illegalMatch !== null ) {
@@ -177,6 +182,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		if( archaic ) useArchaicJS = true;
 		if( noPromise ) noPromisePolyfill = true;
 		if( rebuildGlobal ) useGlobalizer = true;
+		if( noEvent ) noBuildEvent = true;
 		node.setAttribute( "finished-loading", "true" );
 	}
 	let nextLimn = getNextWaitingLimn();
@@ -603,30 +609,28 @@ ${LimnAlias}( "${fullName}", {
 					throw `Bad "${LimnAlias}()" Scope Access`;
 				};
 
-				let code = `return (\n` + 
-						def.factory.toLocaleString() + 
-					`\n)();`,
-					compiled = Function( LimnAlias, code ),
-					method = compiled( badAccessError ),
-					passLimns = {};
+				badAccessError.Outline = ( name, def ) => {
+					console.error(
+						`Module "${fullName}" tried to access the global method `+
+						`"${LimnAlias}.Outline()" for the outline ${name} from inside its factory code or from the module function ` +
+							`returned by its factory code.` +
+						( (!!def) ? 
+							( "\nIt may have been trying to define an outline. Outlines must be defined outside of factory code." ) : 
+							( "\nIt may have been trying access an outline's description for debugging." +
+							"\nAll outline descriptions are available in the code explorer. Please view them there." ) 
+						) +
+						`\n${LimnAlias}.Outline() is not available in factory or module code, because outline functionality` +
+						` only exists during development. Factory and module code must compile to a stand-alone library` +
+						` that is not dependent on LimnJS's outline features.`
+					);
 
-				if( typeof method !== "function" ) {
-					if( method instanceof Promise ||
-						( typeof method.next ) === "function" ) {
-							console.error( `${fullName}'s factory returned a Promise instead of a function.` +
-								"\nFactory methods must always be synchronous." +
-								"\nIf you need to do something asynchronously, such as fetch from a server, " +
-								"please do so inside the module function returned by factory()." )
-							throw "Inherent Module Definition Violation";
-						}
-					else {
-						console.error( `${fullName}'s factory did not return a function.` +
-							"\nInstead it returned: ", method,
-							"\nModule factories must always return a function." );
-						throw "Inherent Module Definition Violation";
-					}
+					throw `Bad "${LimnAlias}.Outline()" Scope Access`;
 				}
-	
+
+				badAccessError.source = true;
+
+				const passLimns = {};
+
 				if( def.returns ) {
 					throwOnReturnsDefinition( fullName, def.returns );
 				}
@@ -679,8 +683,9 @@ ${LimnAlias}( "${fullName}", {
 						}
 					}
 					for( let localName in def.imports ) {
-						let realLimnaryName = def.imports[ localName ];
-						Limn( realLimnaryName, false, privateCall )
+						let literalLimnaryName = def.imports[ localName ],
+							realLimnaryName = literalLimnaryName.replace( /\//g, "." );
+						Limn( literalLimnaryName, false, privateCall )
 							.then( limn => {
 								passLimns[ localName ] = limn;
 								const passDef = LimnaryDefinitions[ realLimnaryName ],
@@ -691,7 +696,7 @@ ${LimnAlias}( "${fullName}", {
 									passLimns[ localName ] = new Proxy( passMethod, {
 										apply: async ( target, thisArg, params ) => {
 											throwOnParameters( realLimnaryName, params, passDef, callerName );
-											let value = passMethod.apply( thisArg, [ passPasses, ...params ] );
+											let value = passMethod.apply( thisArg, params );
 											return throwOnReturn( realLimnaryName, value, passDef.returns, callerName, params );
 										}
 									} );
@@ -700,7 +705,7 @@ ${LimnAlias}( "${fullName}", {
 									passLimns[ localName ] = new Proxy( passMethod, {
 										apply: ( target, thisArg, params ) => {
 											throwOnParameters( realLimnaryName, params, passDef, callerName );
-											let value = passMethod.apply( thisArg, [ passPasses, ...params ] );
+											let value = passMethod.apply( thisArg, params );
 											return throwOnReturn( realLimnaryName, value, passDef.returns, callerName, params );
 										}
 									} );
@@ -709,6 +714,29 @@ ${LimnAlias}( "${fullName}", {
 					}
 				}
 
+				let code = `return (\n` + 
+						def.factory.toLocaleString() + 
+					`\n)();`,
+					compiled = Function( LimnAlias, "imports", code ),
+					method = compiled( badAccessError, passLimns );
+					
+				if( typeof method !== "function" ) {
+					if( method instanceof Promise ||
+						( typeof method.next ) === "function" ) {
+							console.error( `${fullName}'s factory returned a Promise instead of a function.` +
+								"\nFactory methods must always be synchronous." +
+								"\nIf you need to do something asynchronously, such as fetch from a server, " +
+								"please do so inside the module function returned by factory()." )
+							throw "Inherent Module Definition Violation";
+						}
+					else {
+						console.error( `${fullName}'s factory did not return a function.` +
+							"\nInstead it returned: ", method,
+							"\nModule factories must always return a function." );
+						throw "Inherent Module Definition Violation";
+					}
+				}
+	
 				LimnaryMethods[ fullName ] = method;
 				LimnaryPassables[ fullName ] = passLimns;
 				if( typeof privateKeyOrDesc === "string" )
@@ -719,7 +747,7 @@ ${LimnAlias}( "${fullName}", {
 					Limnaries[ fullName ] = new Proxy( method, {
 						apply: async ( target, thisArg, params ) => {
 							throwOnParameters( fullName, params, def, callerName );
-							let value = await method.apply( thisArg, [ passLimns, ...params ] );
+							let value = await method.apply( thisArg, params );
 							return throwOnReturn( fullName, value, def.returns, callerName, params );
 						}
 					} )
@@ -729,7 +757,7 @@ ${LimnAlias}( "${fullName}", {
 					Limnaries[ fullName ] = new Proxy( method, {
 						apply: ( target, thisArg, params ) => {
 							throwOnParameters( fullName, params, def, callerName );
-							let value = method.apply( thisArg, [ passLimns, ...params ] );
+							let value = method.apply( thisArg, params );
 							return throwOnReturn( fullName, value, def.returns, callerName, params );
 						}
 					} );
@@ -1795,21 +1823,13 @@ function ArchaicBuild( globalName ) {
 };` : "",
 		addLimnaryFunction = `${globalName}._ =
 function( ${globalName} ) {
-	${globalName}.method = ${globalName}.factory();
-	${globalName}.limn = ${globalName}.Limnaries[ ${globalName}.name ] =
-	( function( ${globalName} ) { return function() {
-		var newArgs = [ ${globalName}.limnaries ];
-		for( var i = 0; i < arguments.length; i ++ )
-			newArgs.push( arguments[ i ] );
-		return ${globalName}.method.apply( this, newArgs );
-	} } )( Object.freeze( { method: ${globalName}.method, limnaries: ${globalName}.limnaries } ) )
+	${globalName}.Limnaries[ ${globalName}.name ] = ${globalName}.factory();
 
-${ usingEmitter ? `	if( ${globalName}.emit ) ${globalName}.limnaries.emit = ${globalName}.emit;
-	if( ${globalName}.listen ) {
+${ usingEmitter ? `	if( ${globalName}.listen ) {
 		for( var i = 0; i < ${globalName}.listen.length; i ++ ) {
 			var l = ${globalName}.listen[ i ];
 			if( ! ${globalName}.Listeners[ l ] ) ${globalName}.Listeners[ l ] = [];
-			${globalName}.Listeners[ l ].push( ${globalName}.limn );
+			${globalName}.Listeners[ l ].push( ${globalName}.Limnaries[ ${globalName}.name ] );
 		}
 	}` : ""}
 }`,
@@ -1830,17 +1850,17 @@ ${ usingEmitter ? `	Listeners = ${globalName}.Listeners = {},
 			limns = {};
 		for( let localName in definition.imports )
 			limns[ localName ] = definition.imports[ localName ].replace( /\//g, "." );
+		if( definition.emits ) limns.emit = null;
 		let limnaryObject = 
 				`${globalName}.Passables[ "${name}" ] = ${JSON.stringify(limns)||"{}"}`,
 			defineObject =
 `${globalName}._( {
 	Limnaries: ${globalName}.Limnaries,
 	name: "${name}",
-	factory: ${factoryCode},
-	limnaries: ${limnaryObject},
-${ usingEmitter ? 
-`	emit: ${definition.emits?`${globalName}.e`:"false"},
-	Listeners: ${globalName}.Listeners,
+	factory: ( imports => {
+	return ${factoryCode}
+	} )( ${limnaryObject} ),
+${ usingEmitter ? `	Listeners: ${globalName}.Listeners,
 ` : "" }	listen: ${listen?"[\""+listen.join('","')+"\"]":"false"}
 } );`
 		builds.push( defineObject );
@@ -1858,11 +1878,9 @@ ${ usingEmitter ? `			Listeners = undefined,
 `,
 		closer = `
 ${ usingEmitter ? `delete ${globalName}.Listeners;
-delete ${globalName}.e;` : "" }
 delete ${globalName}.Limnaries;
 delete ${globalName}.Passables;
 delete ${globalName}._;
-
 
 var passables,
 	name,
@@ -1870,13 +1888,15 @@ var passables,
 for( name in Passables ) {
 	passables = Passables[ name ];
 	for( localReference in passables ) {
-${ usingEmitter ? `		if( localReference === "emit" ) continue;
+${ usingEmitter ? `		if( localReference === "emit" )
+			passables.emit = ${globalName}.e;
 		else` : "		" } passables[ localReference ] =
 			Limnaries[ passables[ localReference ] ];
 	}
 	Object.freeze( passables );
 }
 Object.freeze( Passables );
+delete ${globalName}.e;` : "" }
 passables = undefined;
 name = undefined;
 localReference = undefined;
@@ -1901,10 +1921,10 @@ localReference = undefined;
 			( "${globalName}" ).replace( /\\//g, "." )
 		]( currentGlobal );
 	window.${globalName} = newGlobal;
-	var event = document.createEvent( "Event" );
+${ noBuildEvent ? "" : `	var event = document.createEvent( "Event" );
 	event.initEvent( "${globalName}", true, true );
 	window.dispatchEvent( event );
-} )( window.${globalName} );
+`}} )( window.${globalName} );
 ` : "";
 
 /*
@@ -1951,15 +1971,10 @@ function BriefBuild( globalName ) {
 };` : "",
 		addLimnaryFunction = `${globalName}._ = 
 ( ${globalName} ) => {
-	${globalName}.method = ${globalName}.factory(),
-	${globalName}.limn = ${globalName}.Limnaries[ ${globalName}.name ] = ( (${globalName}) => {
-		return function( ...parameters ) {
-			return ${globalName}.method.apply( this, [ ${globalName}.limnaries, ...parameters ] )
-		} } )(Object.freeze({ method: ${globalName}.method, limnaries: ${globalName}.limnaries }));
-${ usingEmitter ? `	if( ${globalName}.emit ) ${globalName}.limnaries.emit = ${globalName}.emit;
-	if( ${globalName}.listen ) for( let l of ${globalName}.listen ) {
+	${globalName}.Limnaries[ ${globalName}.name ] = ${globalName}.factory();
+${ usingEmitter ? `	if( ${globalName}.listen ) for( let l of ${globalName}.listen ) {
 		if( ! ${globalName}.Listeners[ l ] ) ${globalName}.Listeners[ l ] = [];
-		${globalName}.Listeners[ l ].push( ${globalName}.limn );
+		${globalName}.Listeners[ l ].push( ${globalName}.Limnaries[ ${globalName}.name ] );
 	}` : "" }
 }`,
 		opener = `
@@ -1980,16 +1995,17 @@ ${ usingEmitter ? `	Listeners = ${globalName}.Listeners = {},
 			limns = {};
 		for( let localName in definition.imports )
 			limns[ localName ] = definition.imports[ localName ].replace( /\//g, "." );
+		if( definition.emits ) limns[ "emit" ] = null;
 		let limnaryObject = 
 				`${globalName}.Passables[ "${name}" ] = ${JSON.stringify(limns)||"{}"}`,
 			defineObject =
 `${globalName}._( {
 	Limnaries: ${globalName}.Limnaries,
 	name: "${name}",
-	factory: ${factoryCode},
-	limnaries: ${limnaryObject},
-${ usingEmitter ? `	emit: ${definition.emits?`${globalName}.e`:"false"},
-	Listeners: ${globalName}.Listeners,
+	factory: ( imports => {
+		return ${factoryCode}
+	} )( ${limnaryObject} ),
+${ usingEmitter ? `	Listeners: ${globalName}.Listeners,
 ` : ""}	listen: ${listen?"[\""+listen.join('","')+"\"]":"false"}
 } );`
 		builds.push( defineObject );
@@ -2006,20 +2022,21 @@ ${builds.join( "\r\n" )}
 `,
 		closer = `
 ${ usingEmitter ? `delete ${globalName}.Listeners;
-delete ${globalName}.e;
 ` : ""}delete ${globalName}.Limnaries;
 delete ${globalName}.Passables;
 delete ${globalName}._;
 for( let name in Passables ) {
 	let passables = Passables[ name ];
 	for( let localReference in passables ) {
-${ usingEmitter ? `		if( localReference === "emit" ) continue;
-` : ""}		passables[ localReference ] =
+${ usingEmitter ? `		if( localReference === "emit" )
+			passables.emit = ${globalName}.e;
+			else ` : "			" }passables[ localReference ] =
 			Limnaries[ passables[ localReference ] ];
 	}
 	Object.freeze( passables );
 }
 Object.freeze( Passables );
+delete ${globalName}.e;
 
 ( ( preexistingLimnaryLookup ) => {
 	window.${globalName} = async ( name ) => {
@@ -2034,8 +2051,8 @@ Object.freeze( Passables );
 ( ( currentGlobal ) => {
 	let newGlobal = Limnaries[ ( "${globalName}" ).replace( /\\//g, "." ) ]( currentGlobal );
 	window.${globalName} = newGlobal;
-	window.dispatchEvent( new Event( "${globalName}" ) );
-} )( window.${globalName} );
+${ noBuildEvent ? "" : `	window.dispatchEvent( new Event( "${globalName}" ) );
+` }} )( window.${globalName} );
 ` : "";
 
 	return `( ( window )=> {
@@ -2208,7 +2225,7 @@ ${[
 			}
 
 			for( let localSubName in def.imports ) {
-				let subName = def.imports[ localSubName ];
+				let subName = def.imports[ localSubName ].replace( /\//g, "." );
 				links.needs[ name ][ subName ] = localSubName;
 				links.neededBy[ subName ] = links.neededBy[ subName ] || {};
 				links.neededBy[ subName ][ name ] = localSubName;
@@ -3096,6 +3113,8 @@ ${[
 			elementsByName[ focus ].tabElement.onclick();
 		}
 	}
+
+	window[ LimnAlias ].source = true;
 
 	if( useGlobalizer ) {
 		( async () => {

@@ -35,10 +35,6 @@ It's the best of all worlds:
         3. [Using Outlines](#using-outlines)
         4. [Outline Primitives](#outline-primitives)
         5. [Creating Outlines](#creating-outlines)
-        6. [Outline Unions](#outline-unions)
-        7. [Outline Intersections](#outline-intersections)
-        8. [Custom Primitive Outlines](#custom-primitive-outlines)
-        9. [Familiar Primitive Imitation](#familiar-primitive-imitation)
         10. [Object Template Outlines](#object-template-outlines)
         11. [Documented Function Outlines](#documented-function-outlines)
         12. [Array Outlines](#array-outlines)
@@ -85,7 +81,7 @@ It's the best of all worlds:
 # Beta
 
 LimnJS is in beta. 
-- It's interface might change
+- Its interface might change
 - It might not behave exactly like the documentation claims
 
 ## Can I Use It?
@@ -104,7 +100,7 @@ Because it is still so young, LimnJS's interface could change.
 ## How Long is Beta?
 
 For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
-- Core features
+- ~~Core features~~
   - ~~load source~~
   - ~~multi-import (separate source directories)~~
   - ~~limns imports~~
@@ -117,6 +113,7 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
     - ~~limn proxies~~
       - ~~type check traps~~
       - ~~caller~~
+    - ~~move imports to scope~~
   - ~~outlines~~
     - ~~definition validation~~
     - ~~fitting~~
@@ -152,10 +149,11 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
       - ~~HTML/CSS recursive graph layout~~
       - ~~upstream dependencies graph~~
       - ~~downstream dependencies graph~~
-  - interface
+  - ~~interface~~
     - ~~exportable modules~~
+    - ~~global dev/source flag~~
     - ~~script tag config~~
-        - no build event
+      - ~~no build event~~
     - ~~redeclarable global~~
       - ~~in LimnJS~~
       - ~~in build~~
@@ -214,7 +212,7 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
   - color dynamic data strings
   - example code in every error
 - Exhaustive documentation
-  - limn.js
+  - ~~load~~
     - ~~Load and Configure LimnJS~~
         - ~~Source-Directory Flag~~
         - ~~Global-Name Flag~~
@@ -225,14 +223,15 @@ For LimnJS to graduate from beta, we must complete *The Neverending Checklist*:
         - ~~Limn~~
         - ~~Limn.Outline~~
         - ~~Limn.Explore~~
-    - Advanced
+        - ~~Limn.source~~
+    - ~~Advanced~~
         - ~~Build-Global Flag~~
             - ~~3 Requirements~~
                 - ~~Requirement 1: Global Name~~
                 - ~~Requirement 2: Load Event~~
                 - ~~Requirement 3: Master Module~~
             - ~~Master Module Example~~
-        - No-Build-Event Flag
+        - ~~No-Build-Event Flag~~
   - explorer
   - modules
   - outlines
@@ -390,7 +389,7 @@ For example, in "source/Data.generate.js" you can see this factory function:
 ```javascript
 //...
 factory: () => {
-    return ( imports, boxCount ) => {
+    return ( boxCount ) => {
         //this code uses object destructuring:
         const { getRef, getScreen } = imports,
             ref = getRef(),
@@ -419,7 +418,7 @@ Finally, in the build file "boxes.1.js" if you scroll down to line 70, you will 
 //...
 name: "Data.generate",
 factory: () => {
-    return ( imports, boxCount ) => {
+    return ( boxCount ) => {
         const { getRef, getScreen } = imports,
             ref = getRef(),
             screen = getScreen();
@@ -480,7 +479,7 @@ MyApp( "Physics.simulator.gravitate", {
     factory: function() {
         //the factory builds our module function and returns it
         var lastUpdated = null;
-        var moduleFunction = function( imports, target ) {
+        var moduleFunction = function( target ) {
             //we imported getConfig:
             var getConfig = imports.getConfig;
             //Limn gave us emit because we declared "emits":...
@@ -510,9 +509,9 @@ That promise resolves once all your modules dependencies have loaded.
 
 Note:  
 
-You never call `MyApp( "..." )` from inside a module's factory or function.  
-Instead, you use the imports:{...} attribute of your module's definition to access other modules.  
-`MyApp("...")` will throw an error if you call it from inside a factory or a module function.
+You never call `MyApp( "..." )` or `MyApp.Outline( "..." )` from inside a module's factory or function.  
+Instead, use the imports:{...} attribute of your module's definition to access other modules.  
+`MyApp("...")` and `MyApp.Outline( "..." )` will throw errors if you call them from inside a factory or a module function.
 
 ---
 
@@ -534,13 +533,13 @@ imports: {
 },
 //...
 ```  
-When your module's function is called, its first argument will be an object.  
+When your module's function is called, it will have an object called "imports" on its scope chain.  
 That object's property names will correspond to the property names of your imports:{} object, and its values will correspond to imported module functions.  
 So, inside your module code, you would access the import above:
 ```javascript
 factory: function(){
     ...
-    var moduleFunction = function( imports ) {
+    var moduleFunction = function() {
         /*we access the imported module with the name used in "imports"*/
         var myFunc = imports[ "anyLocalName" ];
         /*my func now holds the module function of "All.My.Stuff.someSpecificFunction"
@@ -580,10 +579,10 @@ returns: "Main.whateverType*",
 
 ### emits
 
-The limn-events your limn emits.  
+The events your module emits.  
 (Optional when not emiting.)  
 
-Limn has an event manager explained in [listeners](#listeners) below.  
+LimnJS has an event manager explained in [listeners](#listeners) below.  
 ```javascript
 //...
 emits: "Main.Events.what*|Other.Events.yep*",
@@ -596,9 +595,8 @@ A function builds and returns your module function.
 
 *Note: Your entire factory code will appear in your final build, including comments.*  
 
-The factory takes no parameters, but the function it returns takes:
-- 1 parameter - the imports you specified (an empty object if you imported nothing)  
-- ... - the parameters you specified.  
+The factory accepts no parameters. 
+The function it returns accepts the parameters you specified.  
 
 ```javascript
 Limn( "What.builders.makeSomething", {
@@ -611,9 +609,8 @@ parameters:[
 factory: function() {
     //...
     var moduleFunction = 
-        //the first parameter is always "imports"
-        //the next parameters match our definition above
-        function( imports, a, b ) => {
+        //the parameters match our definition above
+        function( a, b ) => {
             //...
         }
 
@@ -629,16 +626,16 @@ Outlines (types) are a development tool for ensuring your functions get the kind
 
 If you already love types, skip this section.
 
-Someone: "Writing out types wastes time. I'm not going to pass a number to my function that expects a URL, obviously. Why would I want types?"  
+Someone: "Specifying types wastes time. I'm not going to pass a number to my function that expects a URL, obviously. Why would I want types?"  
 
 I can relate; and in many cases, that's true.  
 LimnJS doesn't force you to use types.
 
-Still, let me explain the JavaScript problem we're trying to fix with types.  
+Still, types exist to fix a real problem in JavaScript.  
 What if you wrote `thing.Mass` instead of `thing.mass`? You pass that value to your function `calculateAverageMass()`.
 
 Everything looks good. Your program runs normally.
-But, your average has become `NaN`!  
+But, your average comes out `NaN`!  
 There are no errors, but the end-result is wrong. And you don't know why.  
 Maybe you were pulling data from a server. Now you start wondering, do I have a typo in my API request? Am I not getting data back? Is the service down?  
 These problems are real headaches in JavaScript. Outlines (types) prevent these bugs, specifically.
@@ -666,7 +663,7 @@ It will not fit `{a:5}` or `{a:7,b:"no"}`. The object must have at least propert
 ***
 
 Outlines are **"does-it-fit?" tests, not constructors**:  
-Objects are not created from outlines, and outlines don't care how object were created.
+Objects are not created from outlines, and outlines don't care how objects were created.
 
 An outline only checks whether an object meets the outline's requirements.  
 
@@ -674,11 +671,11 @@ An outline only checks whether an object meets the outline's requirements.
 
 Note:
 
-In other languages, if a function requires a `<PhysicsPoint>` type, than somewhere you will have a statement like `<PhysicsPoint> myPoint = new PhysicsPoint( 0,0,0 )` or something similar.  
+In other languages, if a function requires a `<PhysicsPoint>` type, then somewhere you will have a statement like `<PhysicsPoint> myPoint = new PhysicsPoint( 0,0,0 )` or something similar.  
 
-In LimnJS, objects are just objects. We test each object to see if it fits an outline  
+In LimnJS, objects are just objects. We test each object to see if it fits an outline.  
 
-A `"PhysicsPoint*":{x:number,y:number,z:number}` will fit any object with x, y, and z paired to numbers.
+A `"PhysicsPoint*":{x:number,y:number,z:number}` will fit any object with x, y, and z attributes set to numbers.
 
 Also note:
 
@@ -739,51 +736,6 @@ There are 13 primitive types in LimnJS:
 - symbol
 - undefined
 
-There are some oddities in this list.  
-
-In vanilla JavaScript: "null" is an "object", "NaN" is a "number", and "array" is an "object".  
-In LimnJS, all three are unique primitives.  
-If a parameter requires a number, it will throw an error on receiving NaN.  
-If a parameter requires an object, it will throw an error on receiving an array.
-
-Examples of how to create each of these primitive types in Javascript.  
-There are usually multiple ways to create these.  
-For example, arrays can be created using: `new Array()` or `[1,2,3]` or `Array.from( ... )` or `"123".split("")`, and many more.)
-- any: `var a;` (anything works)
-- array: `var a = [1,2,3];`
-- bigint: `var b = BigInt( 22 );`
-- boolean: `var b = true;`
-- function: `var f = function(){}`
-- NaN: `var N = NaN;`
-- never: nothing in Javascript can satisfy `"never"`
-- null: `var n = null;`
-- number: `var n = 1;`
-- object: `var o = {};`
-- string: `var s = "";`
-- symbol: `var s = Symbol();`
-- undefined: `var u = undefined;`
-
-Why are LimnJS's primitives so different from JavaScript and TypeScript?  
-
-1. Types in general already differ from JavaScript, so there was no reason to aim for similarity.  
-2. Because outlines are so permissive, LimnJS needs stricter primitives than TypeScript.
-3. Most importantly, the distinctions would eliminate hard-to-track-down errors in the kind of code I write, at least.  
-(Plus, NaN is literally "not-a-number", so why would I make it a number?)
-
-In addition to the above primitives, you may use the following array-like JavaScript objects as types.  
-However! These will also fit type:"object", so be aware.
-- BigInt64Array,
-- BigUint64Array,
-- Float32Array,
-- Float64Array
-- Int8Array,
-- Int16Array,
-- Int32Array,
-- Uint8Array,
-- Uint8ClampedArray,
-- Uint16Array,
-- Uint32Array,
-
 ### Creating Outlines
 
 Outline names must end with a "*", and must be defined as primitives, named outlines, or objects with named attributes that refer to primitives, named outlines, or similar objects. (That will make sense after some examples.)  
@@ -821,124 +773,6 @@ MyProjectName.Outline(
     "string|number|boolean"
 )
 ```  
-
-### Outline Unions
-
-An outline union uses `"|"` to separate several outlines.  
-```javascript
-MyApp.Outline( "lots*", "string|boolean|object|function" );
-```  
-An outline union mfits any of the outlines in its list.  
-`"lots*"` in the example above will fit a string, a boolean, an object, or a function.
-
-### Outline Intersections
-
-Object outlines can be intersected to fit the properties of both.  
-```javascript
-MyApp.Outline( "hasA*", { "a": "any" } );
-MyApp.Outline( "hasB*", { "b": "any" } );
-MyApp.Outline( "hasAB*", "hasA*" + "hasB*" );
-```  
-The `"hasAB*"` outline requires everything from `"hasA*"` and everything from `"hasB*"`.  
-The object `{a:42,b:true}` would fit `"hasAB*"`.  
-
-Note:
-
-In TypeScript intersections have only properties common to both interfaces.  
-In LimnJS, intersections have all properties of both outlines.
-
-### Custom Primitive Outlines
-
-Create your own primitives by using functions as outline definitions.  
-```javascript
-MyApp.Outline( 
-    ".seven*",
-    function( target ) { 
-        if( target === 7 ) return true;
-        else return false;
-    }
-);
-```  
-An object will be passed to your function.  
-If your function returns something truthy (read about truthy values on [MDN](https://developer.mozilla.org/en-US/docs/Glossary/Truthy)), that object will fit your outline.  
-In the example above, only the number `7` will fit the outline `".seven*"`.  
-
-Using arrow functions (read about arrow functions on [MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions)), primitives can be defined faster.  
-Here is the `".seven*"` primitive defined using an arrow function.
-```javascript
-MyApp.Outline( ".seven*", n => n === 7 );
-```
-
-Behind the scenes, LimnJS primitives work exactly like custom primitives.  
-Here are their definitions:  
-(You couldn't define these yourself, because custom outlines must end in `"*"`.)
-```javascript
-
-Limn.Outline( "any", () => true );
-Limn.Outline( "array", a => Array.isArray( a ) );
-Limn.Outline( "bigint", b => typeof b === "bigint" );
-Limn.Outline( "boolean", b => typeof b === "boolean" );
-Limn.Outline( "function", f => typeof f === "function" );
-Limn.Outline( "NaN", n => ( typeof n === "number" && isNaN( n ) ) );
-Limn.Outline( "never", () => false );
-Limn.Outline( "null", n => n === null );
-Limn.Outline( "number", n => ( typeof n === "number" && ! isNaN( n ) ) );
-Limn.Outline( "object", o => ( typeof o === "object" && 
-                o !== null && ! Array.isArray( o ) ) );
-Limn.Outline( "string", s => ( typeof s === "string" ) );
-Limn.Outline( "symbol", s => ( typeof s === "symbol" ) );
-Limn.Outline( "undefined", u => ( typeof u === "undefined" ) );
-
-Limn.Outline( "BigInt64Array", n => n instanceof BigInt64Array );
-Limn.Outline( "BigUint64Array", n => n instanceof BigUint64Array );
-Limn.Outline( "Float32Array", n => n instanceof Float32Array );
-Limn.Outline( "Float64Array", n => n instanceof Float64Array );
-Limn.Outline( "Int8Array", n => n instanceof Int8Array );
-Limn.Outline( "Int16Array", n => n instanceof Int16Array );
-Limn.Outline( "Int32Array", n => n instanceof Int32Array );
-Limn.Outline( "Uint8Array", n => n instanceof Uint8Array );
-Limn.Outline( "Uint8ClampedArray", n => n instanceof Uint8ClampedArray );
-Limn.Outline( "Uint16Array", n => n instanceof Uint16Array );
-Limn.Outline( "Uint32Array", n => n instanceof Uint32Array );
-```
-
-Note:  
-
-Try to avoid using custom primitives.  
-In LimnJS's documentation, `".seven*"` will simply be described as "primitive", which is not helpful.
-
-### Familiar Primitive Imitation
-
-If you prefer, please use the following outline definitions to imitate a more familiar primitive scheme for your usecase. (If you like JavaScript or TypeScript primitives, this avoids memorizing LimnJS's weird primitives.)
-
-```javascript
-//JavaScript primitives
-//(replace M.Outline with YourProjectName.Outline)
-M.Outline( ".bigint*", "bigint" );
-M.Outline( ".boolean*", "boolean" );
-M.Outline( ".function*", "function" );
-M.Outline( ".number*", "number|NaN" );
-M.Outline( ".object*", "object|array|null" );
-M.Outline( ".string*", "string" );
-M.Outline( ".symbol*", "symbol" );
-M.Outline( ".undefined*", "undefined" );
-```
-
-```javascript
-//TypeScript primitives
-//(replace M.Outline with YourProjectName.Outline)
-M.Outline( ".any*", "any" );
-M.Outline( ".array*", "array|null|undefined" );
-M.Outline( ".boolean*", "boolean|null|undefined" );
-M.Outline( ".function*", "function" );
-M.Outline( ".never*", "never" );
-M.Outline( ".null*", "null" );
-M.Outline( ".number*", "number|NaN|null|undefined" );
-M.Outline( ".object*", "object|array" );
-M.Outline( ".string*", "string|null|undefined" );
-M.Outline( ".undefined*", "undefined" );
-M.Outline( ".void*", "null|undefined" );
-```
 
 ### Object Template Outlines
 
@@ -1117,7 +951,7 @@ MyApp( "Something.act", {
     //...
     factory: function(){
         //...
-        return function( imports ) {
+        return function() {
             //...
             imports.emit( 
                 "Events.eventTypeA*",

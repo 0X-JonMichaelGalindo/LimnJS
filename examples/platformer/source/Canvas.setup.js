@@ -3,7 +3,7 @@ platformer( "Canvas.setup", {
         "getRef": "Canvas.getCanvasContext"
     },
     factory: () => {
-        return ( imports ) => {
+        return () => {
             const { getRef } = imports;
             let canvasContext = getRef();
             canvasContext.cnv = document.body.appendChild( document.createElement( "canvas" ) );

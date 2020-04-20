@@ -1,3 +1,183 @@
+
+### Outline Primitives
+
+There are 13 primitive types in LimnJS:
+- any
+- array
+- bigint
+- boolean
+- function
+- NaN
+- never
+- null
+- number
+- object
+- string
+- symbol
+- undefined
+
+There are some oddities in this list.  
+
+In vanilla JavaScript: "null" is an "object", "NaN" is a "number", and "array" is an "object".  
+In LimnJS, all three are unique primitives.  
+If a parameter requires a number, it will throw an error on receiving NaN.  
+If a parameter requires an object, it will throw an error on receiving an array.
+
+Examples of how to create each of these primitive types in Javascript:  
+(There are many ways to make these. 
+For example, arrays can be made with: `new Array()` or `[1,2,3]` or `Array.from( ... )` or `"123".split("")`, etc.)
+- any: `var a;` (anything works)
+- array: `var a = [1,2,3];`
+- bigint: `var b = BigInt( 22 );`
+- boolean: `var b = true;`
+- function: `var f = function(){}`
+- NaN: `var N = NaN;`
+- never: Impossible. Nothing satisfies `"never"`
+- null: `var n = null;`
+- number: `var n = 1;`
+- object: `var o = {};`
+- string: `var s = "";`
+- symbol: `var s = Symbol();`
+- undefined: `var u = undefined;`
+
+Why are LimnJS's primitives so different from JavaScript and TypeScript?  
+
+1. Because outlines are so permissive, LimnJS needs stricter primitives.
+2. Plus, these distinct primitives eliminate hard-to-track-down errors in the kind of code I write, specifically.  
+
+In addition to these primitives, you may use the following array-like JavaScript objects as types.  
+However! These will also fit type:"object", so be aware.
+- BigInt64Array,
+- BigUint64Array,
+- Float32Array,
+- Float64Array
+- Int8Array,
+- Int16Array,
+- Int32Array,
+- Uint8Array,
+- Uint8ClampedArray,
+- Uint16Array,
+- Uint32Array,
+
+### Outline Unions
+
+An outline union uses `"|"` to separate several outlines.  
+```javascript
+MyApp.Outline( "lots*", "string|boolean|object|function" );
+```  
+An outline union mfits any of the outlines in its list.  
+`"lots*"` in the example above will fit a string, a boolean, an object, or a function.
+
+### Outline Intersections
+
+Note: This syntax is problematic and may be changed! I do not recommend using it for now.
+
+Object outlines can be intersected to fit the properties of both.  
+```javascript
+MyApp.Outline( "hasA*", { "a": "any" } );
+MyApp.Outline( "hasB*", { "b": "any" } );
+MyApp.Outline( "hasAB*", "hasA*" + "hasB*" );
+```  
+The `"hasAB*"` outline requires everything from `"hasA*"` and everything from `"hasB*"`.  
+The object `{a:42,b:true}` would fit `"hasAB*"`.  
+
+Note:
+
+In TypeScript intersections have only properties common to both interfaces.  
+In LimnJS, intersections have all properties of both outlines.
+
+### Custom Primitive Outlines
+
+Create your own primitives by using functions as outline definitions.  
+```javascript
+MyApp.Outline( 
+    ".seven*",
+    function( target ) { 
+        if( target === 7 ) return true;
+        else return false;
+    }
+);
+```  
+An object will be passed to your function.  
+If your function returns something truthy (read about truthy values on [MDN](https://developer.mozilla.org/en-US/docs/Glossary/Truthy)), that object will fit your outline.  
+In the example above, only the number `7` will fit the outline `".seven*"`.  
+
+Using arrow functions (read about arrow functions on [MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions)), primitives can be defined faster.  
+Here is the `".seven*"` primitive defined using an arrow function.
+```javascript
+MyApp.Outline( ".seven*", n => n === 7 );
+```
+
+Behind the scenes, LimnJS primitives work exactly like custom primitives.  
+Here are their definitions:  
+(You couldn't define these yourself, because custom outlines must end in `"*"`.)
+```javascript
+
+Outline( "any", () => true );
+Outline( "array", a => Array.isArray( a ) );
+Outline( "bigint", b => typeof b === "bigint" );
+Outline( "boolean", b => typeof b === "boolean" );
+Outline( "function", f => typeof f === "function" );
+Outline( "NaN", n => ( typeof n === "number" && isNaN( n ) ) );
+Outline( "never", () => false );
+Outline( "null", n => n === null );
+Outline( "number", n => ( typeof n === "number" && ! isNaN( n ) ) );
+Outline( "object", o => ( typeof o === "object" && 
+                o !== null && ! Array.isArray( o ) ) );
+Outline( "string", s => ( typeof s === "string" ) );
+Outline( "symbol", s => ( typeof s === "symbol" ) );
+Outline( "undefined", u => ( typeof u === "undefined" ) );
+
+Outline( "BigInt64Array", n => n instanceof BigInt64Array );
+Outline( "BigUint64Array", n => n instanceof BigUint64Array );
+Outline( "Float32Array", n => n instanceof Float32Array );
+Outline( "Float64Array", n => n instanceof Float64Array );
+Outline( "Int8Array", n => n instanceof Int8Array );
+Outline( "Int16Array", n => n instanceof Int16Array );
+Outline( "Int32Array", n => n instanceof Int32Array );
+Outline( "Uint8Array", n => n instanceof Uint8Array );
+Outline( "Uint8ClampedArray", n => n instanceof Uint8ClampedArray );
+Outline( "Uint16Array", n => n instanceof Uint16Array );
+Outline( "Uint32Array", n => n instanceof Uint32Array );
+```
+
+Note:  
+
+Try to avoid using custom primitives.  
+In LimnJS's documentation, `".seven*"` will simply be described as "primitive", which is not helpful.
+
+### Familiar Primitive Imitation
+
+If you prefer, please use the following outline definitions to imitate a more familiar primitive scheme for your usecase. (If you like JavaScript or TypeScript primitives, this avoids memorizing LimnJS's weird primitives.)
+
+```javascript
+//JavaScript primitives
+MyApp.Outline( ".bigint*", "bigint" );
+MyApp.Outline( ".boolean*", "boolean" );
+MyApp.Outline( ".function*", "function" );
+MyApp.Outline( ".number*", "number|NaN" );
+MyApp.Outline( ".object*", "object|array|null" );
+MyApp.Outline( ".string*", "string" );
+MyApp.Outline( ".symbol*", "symbol" );
+MyApp.Outline( ".undefined*", "undefined" );
+```
+
+```javascript
+//TypeScript primitives
+MyApp.Outline( ".any*", "any" );
+MyApp.Outline( ".array*", "array|null|undefined" );
+MyApp.Outline( ".boolean*", "boolean|null|undefined" );
+MyApp.Outline( ".function*", "function" );
+MyApp.Outline( ".never*", "never" );
+MyApp.Outline( ".null*", "null" );
+MyApp.Outline( ".number*", "number|NaN|null|undefined" );
+MyApp.Outline( ".object*", "object|array" );
+MyApp.Outline( ".string*", "string|null|undefined" );
+MyApp.Outline( ".undefined*", "undefined" );
+MyApp.Outline( ".void*", "null|undefined" );
+```
+
+
 # Recursive Definitions
 
 ```javascript

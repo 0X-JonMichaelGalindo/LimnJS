@@ -7,7 +7,7 @@ boxes( "Data.generate", {
         "boxCount:number"
     ],
     factory: () => {
-        return ( imports, boxCount ) => {
+        return ( boxCount ) => {
             const { getRef, getScreen } = imports,
                 ref = getRef(),
                 screen = getScreen();

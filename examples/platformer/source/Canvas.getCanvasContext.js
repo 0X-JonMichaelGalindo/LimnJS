@@ -2,21 +2,14 @@ platformer.Outline( "NativeTypes.canvas*", "object", "The native HTML5 canvas el
 platformer.Outline( "NativeTypes.canvas.context2d*", "object", "The 2d context of the native HTML5 canvas element." );
 
 platformer.Outline( "Canvas.canvasContext*", {
-    "cnv": "NativeTypes.canvas*",
-    "ctx": "NativeTypes.canvas.context2d*",
+    "cnv": "NativeTypes.canvas*|null",
+    "ctx": "NativeTypes.canvas.context2d*|null",
     "w": "number",
     "h": "number"
-}, "Data associated with the canvas used to draw boxes on-screen." );
-
-platformer.Outline( "Canvas.canvasContextEmpty*", {
-    "cnv": "null",
-    "ctx": "null",
-    "w": "number",
-    "h": "number"
-}, "The unpopulated canvas container." )
+}, "Data associated with the canvas used to draw boxes on-screen." )
 
 platformer( "Canvas.getCanvasContext", {
-    returns: "Canvas.canvasContext*|Canvas.canvasContextEmpty*",
+    returns: "Canvas.canvasContext*",
     factory: () => {
         let canvasContext = {
             cnv: null,

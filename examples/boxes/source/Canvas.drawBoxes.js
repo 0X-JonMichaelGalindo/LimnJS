@@ -4,7 +4,7 @@ boxes( "Canvas.drawBoxes", {
         "getBoxes" : "Data.getDataObject"
     },
     factory: () => {
-        return ( imports ) => {
+        return () => {
             const { getCanvas, getBoxes } = imports,
                 { ctx, w, h } = getCanvas(),
                 { boxes, scale } = getBoxes();

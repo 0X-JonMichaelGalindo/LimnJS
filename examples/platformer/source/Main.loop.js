@@ -11,7 +11,7 @@ platformer( "Main.loop", {
 		"t:number"
 	],
 	factory: () => {
-		return ( imports, t ) => {
+		return t => {
 			const {
 				updateTime,
 				simulate,

@@ -2,8 +2,8 @@
 
 let platformer = {};
 
-const Listeners = platformer.Listeners = {},
-	Limnaries = platformer.Limnaries = {},
+const Limnaries = platformer.Limnaries = {},
+	Listeners = platformer.Listeners = {},
 	Passables = platformer.Passables = {};
 
 platformer.e = async ( name, detail ) => {
@@ -12,30 +12,26 @@ platformer.e = async ( name, detail ) => {
 		if( v && ( typeof v.then === "function" ) ) alls.push( v ); }
 	if( alls.length > 0 ) await Promise.all( alls );
 	return true;
-}
+};
 
 ( ( platformer ) => {
-const Listeners = undefined,
-	Limnaries = undefined,
+const Limnaries = undefined,
+	Listeners = undefined,
 	Passables = undefined;
 platformer._ = 
 ( platformer ) => {
-	platformer.method = platformer.factory(),
-	platformer.limn = platformer.Limnaries[ platformer.name ] = ( (platformer) => {
-		return function( ...parameters ) {
-			return platformer.method.apply( this, [ platformer.limnaries, ...parameters ] )
-		} } )(Object.freeze({ method: platformer.method, limnaries: platformer.limnaries }));
-	if( platformer.emit ) platformer.limnaries.emit = platformer.emit;
+	platformer.Limnaries[ platformer.name ] = platformer.factory();
 	if( platformer.listen ) for( let l of platformer.listen ) {
 		if( ! platformer.Listeners[ l ] ) platformer.Listeners[ l ] = [];
-		platformer.Listeners[ l ].push( platformer.limn );
+		platformer.Listeners[ l ].push( platformer.Limnaries[ platformer.name ] );
 	}
 }
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
 	name: "Main.start",
-	factory: () => {
-        return ( imports ) => {
+	factory: ( imports => {
+		return () => {
+        return () => {
             const { 
                 setupCanvas, 
                 setupWorld, 
@@ -51,35 +47,28 @@ platformer._( {
             bindKeys();
             startAnimationFrame( loop );
         }
-    },
-	limnaries: platformer.Passables[ "Main.start" ] = {"setupCanvas":"Canvas.setup","setupWorld":"World.setup","bindKeys":"IO.bindKeyboardEvents","startAnimationFrame":"Native.requestAnimationFrame","loop":"Main.loop"},
-	emit: false,
+    }
+	} )( platformer.Passables[ "Main.start" ] = {"setupCanvas":"Canvas.setup","setupWorld":"World.setup","bindKeys":"IO.bindKeyboardEvents","startAnimationFrame":"Native.requestAnimationFrame","loop":"Main.loop"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "Canvas.setup",
-	factory: () => {
-        return ( imports ) => {
-            const { getRef } = imports;
-            let canvasContext = getRef();
-            canvasContext.cnv = document.body.appendChild( document.createElement( "canvas" ) );
-            let w = canvasContext.cnv.width = canvasContext.w = 400,
-                h = canvasContext.cnv.height = canvasContext.h = 400;
-            canvasContext.ctx = canvasContext.cnv.getContext( "2d" );
-            canvasContext.ctx.fillStyle = "rgb(220,220,220)";
-            canvasContext.ctx.fillRect( 0,0,w,h );
-        }
-    },
-	limnaries: platformer.Passables[ "Canvas.setup" ] = {"getRef":"Canvas.getCanvasContext"},
-	emit: false,
+	Limnaries: platformer.Limnaries,
+	name: "Native.requestAnimationFrame",
+	factory: ( imports => {
+		return () => {
+        return ( frameFunc ) => window.requestAnimationFrame( frameFunc );
+    }
+	} )( platformer.Passables[ "Native.requestAnimationFrame" ] = {} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
 	name: "World.setup",
-	factory: () => {
-        return ( imports ) => {
+	factory: ( imports => {
+		return () => {
+        return () => {
             const { getScreen, getWorld, getCharacter } = imports;
             let screen = getScreen(),
                 w = screen.w,
@@ -97,16 +86,46 @@ platformer._( {
             character.h = h * 0.1;
             character.w = h * 0.05;
         }
-    },
-	limnaries: platformer.Passables[ "World.setup" ] = {"getScreen":"Canvas.getCanvasContext","getWorld":"World.getWorldData","getCharacter":"World.getCharacterData"},
-	emit: false,
+    }
+	} )( platformer.Passables[ "World.setup" ] = {"getScreen":"Canvas.getCanvasContext","getWorld":"World.getWorldData","getCharacter":"World.getCharacterData"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
+	name: "World.getWorldData",
+	factory: ( imports => {
+		return () => {
+        const worldData = {
+            platforms: []
+        };
+        return () => worldData;
+    }
+	} )( platformer.Passables[ "World.getWorldData" ] = {} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
+	name: "World.getCharacterData",
+	factory: ( imports => {
+		return () => {
+        const characterData = {
+            "x":0, "y":0, "w":0, "h":0,
+            "v": { "x":0, "y":0 },
+        }
+        return () => characterData;
+    }
+	} )( platformer.Passables[ "World.getCharacterData" ] = {} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
 	name: "IO.bindKeyboardEvents",
-	factory: () => {
-		return imports => {
+	factory: ( imports => {
+		return () => {
+		return () => {
 			const { listen, emit, getKeyNames, breakLoop } = imports,
 				keyNames = getKeyNames();
 			listen( "keydown", ( info ) => {
@@ -122,26 +141,145 @@ platformer._( {
 				else if( keyName ) emit( "IO.Events.setKeyState*", {keyName,state} );
 			} );
 		}
-	},
-	limnaries: platformer.Passables[ "IO.bindKeyboardEvents" ] = {"listen":"Native.addGlobalEventListener","getKeyNames":"IO.getBoundKeyNamesByCode","breakLoop":"IO.breakGameLoop"},
-	emit: platformer.e,
+	}
+	} )( platformer.Passables[ "IO.bindKeyboardEvents" ] = {"listen":"Native.addGlobalEventListener","getKeyNames":"IO.getBoundKeyNamesByCode","breakLoop":"IO.breakGameLoop","emit":null} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "Native.requestAnimationFrame",
-	factory: () => {
-        return ( _, frameFunc ) => window.requestAnimationFrame( frameFunc );
-    },
-	limnaries: platformer.Passables[ "Native.requestAnimationFrame" ] = {},
-	emit: false,
+	Limnaries: platformer.Limnaries,
+	name: "Canvas.getCanvasContext",
+	factory: ( imports => {
+		return () => {
+        let canvasContext = {
+            cnv: null,
+            ctx: null,
+            w: -1,
+            h: -1
+        }
+        return ( () => canvasContext );
+    }
+	} )( platformer.Passables[ "Canvas.getCanvasContext" ] = {} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
+	name: "IO.EventHandlers.recordKeyState",
+	factory: ( imports => {
+		return () => {
+        return ( eventName, eventDetail ) => {
+            imports.getKeyStates()[ eventDetail.keyName ] = eventDetail.state;
+        }
+    }
+	} )( platformer.Passables[ "IO.EventHandlers.recordKeyState" ] = {"getKeyStates":"IO.getKeyStates"} ),
+	Listeners: platformer.Listeners,
+	listen: ["IO.Events.setKeyState*"]
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
+	name: "Canvas.setup",
+	factory: ( imports => {
+		return () => {
+        return () => {
+            const { getRef } = imports;
+            let canvasContext = getRef();
+            canvasContext.cnv = document.body.appendChild( document.createElement( "canvas" ) );
+            let w = canvasContext.cnv.width = canvasContext.w = 400,
+                h = canvasContext.cnv.height = canvasContext.h = 400;
+            canvasContext.ctx = canvasContext.cnv.getContext( "2d" );
+            canvasContext.ctx.fillStyle = "rgb(220,220,220)";
+            canvasContext.ctx.fillRect( 0,0,w,h );
+        }
+    }
+	} )( platformer.Passables[ "Canvas.setup" ] = {"getRef":"Canvas.getCanvasContext"} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
+	name: "Native.addGlobalEventListener",
+	factory: ( imports => {
+		return () => {
+        return ( name, handle ) => window.addEventListener( name, handle );
+    }
+	} )( platformer.Passables[ "Native.addGlobalEventListener" ] = {} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
+	name: "IO.breakGameLoop",
+	factory: ( imports => {
+		return () => {
+        return () => { 
+            imports.getGameState().flags.looping = false;
+            console.log( "Broke game loop!" );
+        }
+    }
+	} )( platformer.Passables[ "IO.breakGameLoop" ] = {"getGameState":"IO.getGameState"} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
+	name: "IO.getKeyStates",
+	factory: ( imports => {
+		return () => {
+        return () => imports.getGameState().keyStates;
+    }
+	} )( platformer.Passables[ "IO.getKeyStates" ] = {"getGameState":"IO.getGameState"} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
+	name: "IO.getBoundKeyNamesByCode",
+	factory: ( imports => {
+		return () => {
+        let keyNamesByCode = Object.freeze( {
+            "37": "left-arrow",
+            "38": "up-arrow",
+            "39": "right-arrow",
+            "40": "down-arrow",
+            "27": "break"
+        } );
+        return () => keyNamesByCode;
+    }
+	} )( platformer.Passables[ "IO.getBoundKeyNamesByCode" ] = {} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
+	name: "IO.getGameState",
+	factory: ( imports => {
+		return () => {
+        let gameState = {
+            flags: {
+                "looping": true
+            },
+            "keyStates": {
+                "left-arrow": false,
+                "up-arrow": false,
+                "right-arrow": false,
+                "down-arrow": false,
+            },
+            "time": null,
+            "deltaTime": 1
+        }
+        return () => gameState;
+    }
+	} )( platformer.Passables[ "IO.getGameState" ] = {} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
 	name: "Main.loop",
-	factory: () => {
-		return ( imports, t ) => {
+	factory: ( imports => {
+		return () => {
+		return t => {
 			const {
 				updateTime,
 				simulate,
@@ -158,111 +296,17 @@ platformer._( {
 			if( stillLooping() === true )
 				startAnimationFrame( loop );
 		}
-	},
-	limnaries: platformer.Passables[ "Main.loop" ] = {"updateTime":"IO.updateTime","simulate":"Simulator.main","draw":"Canvas.drawWorld","startAnimationFrame":"Native.requestAnimationFrame","loop":"Main.loop","stillLooping":"IO.getLoopingState"},
-	emit: false,
+	}
+	} )( platformer.Passables[ "Main.loop" ] = {"updateTime":"IO.updateTime","simulate":"Simulator.main","draw":"Canvas.drawWorld","startAnimationFrame":"Native.requestAnimationFrame","loop":"Main.loop","stillLooping":"IO.getLoopingState"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "Canvas.getCanvasContext",
-	factory: () => {
-        let canvasContext = {
-            cnv: null,
-            ctx: null,
-            w: -1,
-            h: -1
-        }
-        return ( () => canvasContext );
-    },
-	limnaries: platformer.Passables[ "Canvas.getCanvasContext" ] = {},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "World.getWorldData",
-	factory: () => {
-        const worldData = {
-            platforms: []
-        };
-        return () => worldData;
-    },
-	limnaries: platformer.Passables[ "World.getWorldData" ] = {},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "World.getCharacterData",
-	factory: () => {
-        const characterData = {
-            "x":0, "y":0, "w":0, "h":0,
-            "v": { "x":0, "y":0 },
-        }
-        return () => characterData;
-    },
-	limnaries: platformer.Passables[ "World.getCharacterData" ] = {},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "IO.EventHandlers.recordKeyState",
-	factory: () => {
-        return ( imports, eventName, eventDetail ) => {
-            imports.getKeyStates()[ eventDetail.keyName ] = eventDetail.state;
-        }
-    },
-	limnaries: platformer.Passables[ "IO.EventHandlers.recordKeyState" ] = {"getKeyStates":"IO.getKeyStates"},
-	emit: false,
-	listen: ["IO.Events.setKeyState*"]
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "Native.addGlobalEventListener",
-	factory: () => {
-        return ( _, name, handle ) => window.addEventListener( name, handle );
-    },
-	limnaries: platformer.Passables[ "Native.addGlobalEventListener" ] = {},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "IO.getBoundKeyNamesByCode",
-	factory: () => {
-        let keyNamesByCode = Object.freeze( {
-            "37": "left-arrow",
-            "38": "up-arrow",
-            "39": "right-arrow",
-            "40": "down-arrow",
-            "27": "break"
-        } );
-        return () => keyNamesByCode;
-    },
-	limnaries: platformer.Passables[ "IO.getBoundKeyNamesByCode" ] = {},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "IO.breakGameLoop",
-	factory: () => {
-        return imports => { 
-            imports.getGameState().flags.looping = false;
-            console.log( "Broke game loop!" );
-        }
-    },
-	limnaries: platformer.Passables[ "IO.breakGameLoop" ] = {"getGameState":"IO.getGameState"},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
 	name: "IO.updateTime",
-	factory: () => {
-        return ( imports, t ) => {
+	factory: ( imports => {
+		return () => {
+        return t => {
             const { getState } = imports,
                 state = getState();
             if( state.time === null )
@@ -271,16 +315,28 @@ platformer._( {
             state.deltaTime = dt;
             state.time = t;
         }
-    },
-	limnaries: platformer.Passables[ "IO.updateTime" ] = {"getState":"IO.getGameState"},
-	emit: false,
+    }
+	} )( platformer.Passables[ "IO.updateTime" ] = {"getState":"IO.getGameState"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
+	name: "IO.getLoopingState",
+	factory: ( imports => {
+		return () => {
+        return () => imports.state().flags.looping;
+    }
+	} )( platformer.Passables[ "IO.getLoopingState" ] = {"state":"IO.getGameState"} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
 	name: "Simulator.main",
-	factory: () => {
-        return imports => {
+	factory: ( imports => {
+		return () => {
+        return () => {
             const { getState, getConfig, 
                     jump, strafe, fall, frict, move,
                     keepInScreen } = imports,
@@ -297,16 +353,17 @@ platformer._( {
                 state.deltaTime -= simulatorTimestep;
             }
         }
-    },
-	limnaries: platformer.Passables[ "Simulator.main" ] = {"getState":"IO.getGameState","getConfig":"Simulator.getConfiguration","jump":"Simulator.jump","strafe":"Simulator.strafe","fall":"Simulator.fall","frict":"Simulator.frict","move":"Simulator.move","keepInScreen":"Simulator.keepCharacterOnScreen"},
-	emit: false,
+    }
+	} )( platformer.Passables[ "Simulator.main" ] = {"getState":"IO.getGameState","getConfig":"Simulator.getConfiguration","jump":"Simulator.jump","strafe":"Simulator.strafe","fall":"Simulator.fall","frict":"Simulator.frict","move":"Simulator.move","keepInScreen":"Simulator.keepCharacterOnScreen"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
 	name: "Canvas.drawWorld",
-	factory: () => {
-        return ( imports ) => {
+	factory: ( imports => {
+		return () => {
+        return () => {
             const { getWorld, getCharacter, getCanvas } = imports,
                 { cnv, ctx, w, h } = getCanvas(),
                 { platforms } = getWorld();
@@ -320,58 +377,75 @@ platformer._( {
             let char = getCharacter();
             ctx.fillRect( char.x, char.y, char.w, char.h );
         }
-    },
-	limnaries: platformer.Passables[ "Canvas.drawWorld" ] = {"getWorld":"World.getWorldData","getCharacter":"World.getCharacterData","getCanvas":"Canvas.getCanvasContext"},
-	emit: false,
+    }
+	} )( platformer.Passables[ "Canvas.drawWorld" ] = {"getWorld":"World.getWorldData","getCharacter":"World.getCharacterData","getCanvas":"Canvas.getCanvasContext"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "IO.getLoopingState",
-	factory: () => {
-        return imports => imports.state().flags.looping;
-    },
-	limnaries: platformer.Passables[ "IO.getLoopingState" ] = {"state":"IO.getGameState"},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "IO.getKeyStates",
-	factory: () => {
-        return imports => imports.getGameState().keyStates;
-    },
-	limnaries: platformer.Passables[ "IO.getKeyStates" ] = {"getGameState":"IO.getGameState"},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "IO.getGameState",
-	factory: () => {
-        let gameState = {
-            flags: {
-                "looping": true
-            },
-            "keyStates": {
-                "left-arrow": false,
-                "up-arrow": false,
-                "right-arrow": false,
-                "down-arrow": false,
-            },
-            "time": null,
-            "deltaTime": 1
+	Limnaries: platformer.Limnaries,
+	name: "Simulator.move",
+	factory: ( imports => {
+		return () => {
+        return t => {
+            const { getChar } = imports,
+                char = getChar();
+            char.x += char.v.x * t;
+            char.y += char.v.y * t;
         }
-        return () => gameState;
-    },
-	limnaries: platformer.Passables[ "IO.getGameState" ] = {},
-	emit: false,
+    }
+	} )( platformer.Passables[ "Simulator.move" ] = {"getChar":"World.getCharacterData"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
+	name: "Simulator.strafe",
+	factory: ( imports => {
+		return () => {
+		return t => {
+			const { getConfig, getKeyStates, getChar } = imports,
+				config = getConfig(),
+				keys = getKeyStates(),
+				char = getChar();
+			if( keys[ "left-arrow" ] ) 
+				char.v.x -= t * config.strafeAcceleration;
+			if( keys[ "right-arrow" ] )
+				char.v.x += t * config.strafeAcceleration;
+		}
+	}
+	} )( platformer.Passables[ "Simulator.strafe" ] = {"getConfig":"Simulator.getConfiguration","getKeyStates":"IO.getKeyStates","getChar":"World.getCharacterData"} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
+	name: "Simulator.fall",
+	factory: ( imports => {
+		return () => {
+		return t => {
+			const { getConfig, getChar, hit } = imports,
+				config = getConfig(),
+				char = getChar(),
+				hitState = hit();
+			if( hitState.depth > 0 ) {
+				char.y = hitState.platformY - char.h;
+				if( char.v.y > 0 ) char.v.y = 0;
+			}
+			else if( hitState.depth !== 0 ) {
+				char.v.y += t * config.gravityAcceleration
+			}
+		}
+	}
+	} )( platformer.Passables[ "Simulator.fall" ] = {"getConfig":"Simulator.getConfiguration","getChar":"World.getCharacterData","hit":"World.checkCharacterPlatformCollision"} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
 	name: "Simulator.getConfiguration",
-	factory: () => {
+	factory: ( imports => {
+		return () => {
         let configuration = {
             "strafeAcceleration": 0.02,
             "jumpAcceleration": 0.25,
@@ -386,16 +460,17 @@ platformer._( {
             }
         }
         return () => configuration;
-    },
-	limnaries: platformer.Passables[ "Simulator.getConfiguration" ] = {},
-	emit: false,
+    }
+	} )( platformer.Passables[ "Simulator.getConfiguration" ] = {} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
 	name: "Simulator.jump",
-	factory: () => {
-		return ( imports, t ) => {
+	factory: ( imports => {
+		return () => {
+		return t => {
 			const { getConfig, getKeyStates, getChar, checkHit } = imports,
 				config = getConfig(),
 				keys = getKeyStates(),
@@ -404,95 +479,17 @@ platformer._( {
 			if( hit.depth === 0 && keys[ "up-arrow" ] ) 
 				char.v.y -= t * config.jumpAcceleration;
 		}
-	},
-	limnaries: platformer.Passables[ "Simulator.jump" ] = {"getConfig":"Simulator.getConfiguration","getKeyStates":"IO.getKeyStates","getChar":"World.getCharacterData","checkHit":"World.checkCharacterPlatformCollision"},
-	emit: false,
+	}
+	} )( platformer.Passables[ "Simulator.jump" ] = {"getConfig":"Simulator.getConfiguration","getKeyStates":"IO.getKeyStates","getChar":"World.getCharacterData","checkHit":"World.checkCharacterPlatformCollision"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "Simulator.strafe",
-	factory: () => {
-		return ( imports, t ) => {
-			const { getConfig, getKeyStates, getChar } = imports,
-				config = getConfig(),
-				keys = getKeyStates(),
-				char = getChar();
-			if( keys[ "left-arrow" ] ) 
-				char.v.x -= t * config.strafeAcceleration;
-			if( keys[ "right-arrow" ] )
-				char.v.x += t * config.strafeAcceleration;
-		}
-	},
-	limnaries: platformer.Passables[ "Simulator.strafe" ] = {"getConfig":"Simulator.getConfiguration","getKeyStates":"IO.getKeyStates","getChar":"World.getCharacterData"},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "Simulator.fall",
-	factory: () => {
-		return ( imports, t ) => {
-			const { getConfig, getChar, hit } = imports,
-				config = getConfig(),
-				char = getChar(),
-				hitState = hit();
-			if( hitState.depth > 0 ) {
-				char.y = hitState.platformY - char.h;
-				if( char.v.y > 0 ) char.v.y = 0;
-			}
-			else if( hitState.depth !== 0 ) {
-				char.v.y += t * config.gravityAcceleration
-			}
-		}
-	},
-	limnaries: platformer.Passables[ "Simulator.fall" ] = {"getConfig":"Simulator.getConfiguration","getChar":"World.getCharacterData","hit":"World.checkCharacterPlatformCollision"},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "Simulator.frict",
-	factory: () => {
-        return ( imports, t ) => {
-            const { getConfig, getChar, checkHit } = imports,
-                config = getConfig(),
-                char = getChar(),
-                hit = checkHit();
-            if( Math.abs( char.v.x ) > config.limits.velocity.x )
-                char.v.x = ( char.v.x > 0 ) ?
-                    config.limits.velocity.x : -config.limits.velocity.x;
-            if( Math.abs( char.v.y ) > config.limits.velocity.y )
-                char.v.y = ( char.v.y > 0 ) ?
-                config.limits.velocity.y : -config.limits.velocity.y;
-            //apply friction in air too, for better control
-            char.v.x *= config.coefficientOfFriction ** t;
-        }
-    },
-	limnaries: platformer.Passables[ "Simulator.frict" ] = {"getConfig":"Simulator.getConfiguration","getChar":"World.getCharacterData","checkHit":"World.checkCharacterPlatformCollision"},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
-	name: "Simulator.move",
-	factory: () => {
-        return ( imports, t ) => {
-            const { getChar } = imports,
-                char = getChar();
-            char.x += char.v.x * t;
-            char.y += char.v.y * t;
-        }
-    },
-	limnaries: platformer.Passables[ "Simulator.move" ] = {"getChar":"World.getCharacterData"},
-	emit: false,
-	listen: false
-} );
-platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
 	name: "Simulator.keepCharacterOnScreen",
-	factory: () => {
-        return imports => {
+	factory: ( imports => {
+		return () => {
+        return () => {
             const { getChar, getScreen } = imports,
                 char = getChar(),
                 screen = getScreen();
@@ -500,16 +497,17 @@ platformer._( {
             if( ( char.x + char.w ) > screen.w )
                 char.x = screen.w - char.w;
         }
-    },
-	limnaries: platformer.Passables[ "Simulator.keepCharacterOnScreen" ] = {"getChar":"World.getCharacterData","getScreen":"Canvas.getCanvasContext"},
-	emit: false,
+    }
+	} )( platformer.Passables[ "Simulator.keepCharacterOnScreen" ] = {"getChar":"World.getCharacterData","getScreen":"Canvas.getCanvasContext"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 platformer._( {
-	Limnaries: platformer.Limnaries, Listeners: platformer.Listeners,
+	Limnaries: platformer.Limnaries,
 	name: "World.checkCharacterPlatformCollision",
-	factory: () => {
-		return imports => {
+	factory: ( imports => {
+		return () => {
+		return () => {
 			const { getScreen, getConfig, getWorld, getChar } = imports,
 				screenHeight = getScreen().h,
 				config = getConfig(),
@@ -535,9 +533,33 @@ platformer._( {
 			}
 			return hit;
 		}
-	},
-	limnaries: platformer.Passables[ "World.checkCharacterPlatformCollision" ] = {"getScreen":"Canvas.getCanvasContext","getConfig":"Simulator.getConfiguration","getWorld":"World.getWorldData","getChar":"World.getCharacterData"},
-	emit: false,
+	}
+	} )( platformer.Passables[ "World.checkCharacterPlatformCollision" ] = {"getScreen":"Canvas.getCanvasContext","getConfig":"Simulator.getConfiguration","getWorld":"World.getWorldData","getChar":"World.getCharacterData"} ),
+	Listeners: platformer.Listeners,
+	listen: false
+} );
+platformer._( {
+	Limnaries: platformer.Limnaries,
+	name: "Simulator.frict",
+	factory: ( imports => {
+		return () => {
+        return t => {
+            const { getConfig, getChar, checkHit } = imports,
+                config = getConfig(),
+                char = getChar(),
+                hit = checkHit();
+            if( Math.abs( char.v.x ) > config.limits.velocity.x )
+                char.v.x = ( char.v.x > 0 ) ?
+                    config.limits.velocity.x : -config.limits.velocity.x;
+            if( Math.abs( char.v.y ) > config.limits.velocity.y )
+                char.v.y = ( char.v.y > 0 ) ?
+                config.limits.velocity.y : -config.limits.velocity.y;
+            //apply friction in air too, for better control
+            char.v.x *= config.coefficientOfFriction ** t;
+        }
+    }
+	} )( platformer.Passables[ "Simulator.frict" ] = {"getConfig":"Simulator.getConfiguration","getChar":"World.getCharacterData","checkHit":"World.checkCharacterPlatformCollision"} ),
+	Listeners: platformer.Listeners,
 	listen: false
 } );
 } )( platformer )
@@ -547,17 +569,18 @@ delete platformer.Listeners;
 delete platformer.Limnaries;
 delete platformer.Passables;
 delete platformer._;
-delete platformer.e;
 for( let name in Passables ) {
 	let passables = Passables[ name ];
 	for( let localReference in passables ) {
-		if( localReference === "emit" ) continue;
-		passables[ localReference ] =
+		if( localReference === "emit" )
+			passables.emit = platformer.e;
+			else passables[ localReference ] =
 			Limnaries[ passables[ localReference ] ];
 	}
 	Object.freeze( passables );
 }
 Object.freeze( Passables );
+delete platformer.e;
 
 ( ( preexistingLimnaryLookup ) => {
 	window.platformer = async ( name ) => {
@@ -565,6 +588,7 @@ Object.freeze( Passables );
 		return ( typeof preexistingLimnaryLookup === "function" ) ?
 			( thisLimnary || preexistingLimnaryLookup( name ) ) : thisLimnary;
 	}
-} )( window.platformer )
+} )( window.platformer );
+
  
 } )( window || global )

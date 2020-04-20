@@ -12,32 +12,49 @@ const Limnaries = undefined,
 	Passables = undefined;
 boxes._ = 
 ( boxes ) => {
-	boxes.method = boxes.factory(),
-	boxes.limn = boxes.Limnaries[ boxes.name ] = ( (boxes) => {
-		return function( ...parameters ) {
-			return boxes.method.apply( this, [ boxes.limnaries, ...parameters ] )
-		} } )(Object.freeze({ method: boxes.method, limnaries: boxes.limnaries }));
+	boxes.Limnaries[ boxes.name ] = boxes.factory();
 
 }
 boxes._( {
 	Limnaries: boxes.Limnaries,
 	name: "Main.start",
-	factory: () => {
-		return ( imports ) => {
+	factory: ( imports => {
+		return () => {
+		return () => {
 			const { setupCanvas, makeBoxes, draw } = imports;
 			setupCanvas();
 			makeBoxes( 100 );
 			draw();
 		}
-	},
-	limnaries: boxes.Passables[ "Main.start" ] = {"setupCanvas":"Canvas.setup","makeBoxes":"Data.generate","draw":"Canvas.drawBoxes"},
+	}
+	} )( boxes.Passables[ "Main.start" ] = {"setupCanvas":"Canvas.setup","makeBoxes":"Data.generate","draw":"Canvas.drawBoxes"} ),
+	listen: false
+} );
+boxes._( {
+	Limnaries: boxes.Limnaries,
+	name: "Canvas.setup",
+	factory: ( imports => {
+		return () => {
+        return () => {
+            const { getRef } = imports;
+            let canvasContext = getRef();
+            canvasContext.cnv = document.body.appendChild( document.createElement( "canvas" ) );
+            let w = canvasContext.cnv.width = canvasContext.w = 400,
+                h = canvasContext.cnv.height = canvasContext.h = 400;
+            canvasContext.ctx = canvasContext.cnv.getContext( "2d" );
+            canvasContext.ctx.fillStyle = "rgb(220,220,220)";
+            canvasContext.ctx.fillRect( 0,0,w,h );
+        }
+    }
+	} )( boxes.Passables[ "Canvas.setup" ] = {"getRef":"Canvas.getCanvasContext"} ),
 	listen: false
 } );
 boxes._( {
 	Limnaries: boxes.Limnaries,
 	name: "Data.generate",
-	factory: () => {
-        return ( imports, boxCount ) => {
+	factory: ( imports => {
+		return () => {
+        return ( boxCount ) => {
             const { getRef, getScreen } = imports,
                 ref = getRef(),
                 screen = getScreen();
@@ -53,33 +70,16 @@ boxes._( {
                     h: Math.random()
                 } );
         }
-    },
-	limnaries: boxes.Passables[ "Data.generate" ] = {"getRef":"Data.getDataObject","getScreen":"Canvas.getCanvasContext"},
-	listen: false
-} );
-boxes._( {
-	Limnaries: boxes.Limnaries,
-	name: "Canvas.setup",
-	factory: () => {
-        return ( imports ) => {
-            const { getRef } = imports;
-            let canvasContext = getRef();
-            canvasContext.cnv = document.body.appendChild( document.createElement( "canvas" ) );
-            let w = canvasContext.cnv.width = canvasContext.w = 400,
-                h = canvasContext.cnv.height = canvasContext.h = 400;
-            canvasContext.ctx = canvasContext.cnv.getContext( "2d" );
-            canvasContext.ctx.fillStyle = "rgb(220,220,220)";
-            canvasContext.ctx.fillRect( 0,0,w,h );
-        }
-    },
-	limnaries: boxes.Passables[ "Canvas.setup" ] = {"getRef":"Canvas.getCanvasContext"},
+    }
+	} )( boxes.Passables[ "Data.generate" ] = {"getRef":"Data.getDataObject","getScreen":"Canvas.getCanvasContext"} ),
 	listen: false
 } );
 boxes._( {
 	Limnaries: boxes.Limnaries,
 	name: "Canvas.drawBoxes",
-	factory: () => {
-        return ( imports ) => {
+	factory: ( imports => {
+		return () => {
+        return () => {
             const { getCanvas, getBoxes } = imports,
                 { ctx, w, h } = getCanvas(),
                 { boxes, scale } = getBoxes();
@@ -95,14 +95,15 @@ boxes._( {
                 )
             }
         }
-    },
-	limnaries: boxes.Passables[ "Canvas.drawBoxes" ] = {"getCanvas":"Canvas.getCanvasContext","getBoxes":"Data.getDataObject"},
+    }
+	} )( boxes.Passables[ "Canvas.drawBoxes" ] = {"getCanvas":"Canvas.getCanvasContext","getBoxes":"Data.getDataObject"} ),
 	listen: false
 } );
 boxes._( {
 	Limnaries: boxes.Limnaries,
 	name: "Canvas.getCanvasContext",
-	factory: () => {
+	factory: ( imports => {
+		return () => {
         let canvasContext = {
             cnv: null,
             ctx: null,
@@ -110,14 +111,15 @@ boxes._( {
             h: -1
         }
         return ( () => canvasContext );
-    },
-	limnaries: boxes.Passables[ "Canvas.getCanvasContext" ] = {},
+    }
+	} )( boxes.Passables[ "Canvas.getCanvasContext" ] = {} ),
 	listen: false
 } );
 boxes._( {
 	Limnaries: boxes.Limnaries,
 	name: "Data.getDataObject",
-	factory: () => {
+	factory: ( imports => {
+		return () => {
         let data = {
             boxes: [],
             scale: {
@@ -126,8 +128,8 @@ boxes._( {
             }
         }
         return ( () => data );
-    },
-	limnaries: boxes.Passables[ "Data.getDataObject" ] = {},
+    }
+	} )( boxes.Passables[ "Data.getDataObject" ] = {} ),
 	listen: false
 } );
 } )( boxes )
@@ -139,12 +141,13 @@ delete boxes._;
 for( let name in Passables ) {
 	let passables = Passables[ name ];
 	for( let localReference in passables ) {
-		passables[ localReference ] =
+			passables[ localReference ] =
 			Limnaries[ passables[ localReference ] ];
 	}
 	Object.freeze( passables );
 }
 Object.freeze( Passables );
+delete boxes.e;
 
 ( ( preexistingLimnaryLookup ) => {
 	window.boxes = async ( name ) => {
@@ -152,6 +155,7 @@ Object.freeze( Passables );
 		return ( typeof preexistingLimnaryLookup === "function" ) ?
 			( thisLimnary || preexistingLimnaryLookup( name ) ) : thisLimnary;
 	}
-} )( window.boxes )
+} )( window.boxes );
+
  
 } )( window || global )

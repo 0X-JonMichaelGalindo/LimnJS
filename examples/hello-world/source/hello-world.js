@@ -1,7 +1,7 @@
 Hello( "hello-world", {
     parameters: [ "name:string" ],
     factory: function() {
-        function helloWorldMethod( imports, name ) {
+        function helloWorldMethod( name ) {
             document.body.innerText = "Hello, World! Hello, " + name + "!";
         }
 

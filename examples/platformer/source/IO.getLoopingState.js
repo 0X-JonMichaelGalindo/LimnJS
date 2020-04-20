@@ -4,6 +4,6 @@ platformer( "IO.getLoopingState", {
     },
     returns: "boolean",
     factory: () => {
-        return imports => imports.state().flags.looping;
+        return () => imports.state().flags.looping;
     }
 })

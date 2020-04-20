@@ -9,7 +9,7 @@ platformer( "Main.start", {
         "loop": "Main.loop",
     },
     factory: () => {
-        return ( imports ) => {
+        return () => {
             const { 
                 setupCanvas, 
                 setupWorld, 

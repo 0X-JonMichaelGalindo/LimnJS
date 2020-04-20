@@ -13,7 +13,7 @@ platformer( "IO.bindKeyboardEvents", {
 	},
 	emits: "IO.Events.setKeyState*",
 	factory: () => {
-		return imports => {
+		return () => {
 			const { listen, emit, getKeyNames, breakLoop } = imports,
 				keyNames = getKeyNames();
 			listen( "keydown", ( info ) => {

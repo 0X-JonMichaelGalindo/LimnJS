@@ -3,7 +3,7 @@ platformer( "IO.breakGameLoop", {
         "getGameState": "IO.getGameState"
     },
     factory: () => {
-        return imports => { 
+        return () => { 
             imports.getGameState().flags.looping = false;
             console.log( "Broke game loop!" );
         }

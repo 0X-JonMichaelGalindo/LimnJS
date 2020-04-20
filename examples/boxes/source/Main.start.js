@@ -5,7 +5,7 @@ boxes( "Main.start", {
 		"draw": "Canvas.drawBoxes"
 	},
 	factory: () => {
-		return ( imports ) => {
+		return () => {
 			const { setupCanvas, makeBoxes, draw } = imports;
 			setupCanvas();
 			makeBoxes( 100 );
