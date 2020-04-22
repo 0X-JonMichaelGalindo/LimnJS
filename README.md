@@ -721,7 +721,7 @@ For example, if our function above retuned "undefined", we would see:
 
 ### Outline Primitives
 
-There are 13 primitive types in LimnJS:
+There are 14 primitive types in LimnJS:
 - any
 - array
 - bigint
@@ -735,6 +735,7 @@ There are 13 primitive types in LimnJS:
 - string
 - symbol
 - undefined
+- unset
 
 ### Creating Outlines
 
@@ -885,14 +886,14 @@ MyProjectName.Outline( "itsAnArray*", "array" )
 ```  
 `[2,true,"hi"]` will fit `"itsAnArray*"`. Any array will.
 
-An array outline with one or more names will fit an array whose entries fit those names, in order.
+An array outline with one or more names will fit an array whose entries fit those names, in order, regardless of what follows.
 
 With one name:
 ```javascript
 MyProjectName.Outline( "oneStringArray*", [ "string" ] )
 ```  
 `[ "hi" ]` will fit `"oneStringArray*"`.  
-`[ "hi", "there" ]` will not fit `"oneStringArray*"`. A fitting array must contain exactly 1 string.
+`[ "hi", 5, 22, 99 ]` will also fit `"oneStringArray*"`. A fitting array must contain 1 string in the 0 position. Whatever comes after does not matter.
 
 With multiple names:
 ```javascript
@@ -900,19 +901,25 @@ MyProjectName.Outline( "str-num*", [ "string", "number" ] )
 ```  
 `[ "hi", 7 ]` will fit `"str-num*"`.  
 `[ 7, "No" ]` will not fit `"str-num*"`. A fitting array must contain 1 string, then 1 number.  
-`[ "hi", 7, "no" ]` will not fit `"str-num*"`. A fitting array must contain 1 string, then 1 number. Nothing else.
+`[ "hi", 7, "no" ]` will also fit `"str-num*"`. A fitting array must contain 1 string, then 1 number. Whatever comes after does not matter.
+
+For example, if you only require an array to contain a `number` at index 2, use:
+```javascript
+MyProjectName.Outline( "number-at-2*", [ "any","any","number" ] );
+```
 
 ### Array Template Outlines
 
 An outline array ending with the etcetera operator (`"..."`) is an array template.
 
-With 1 type, an array template fits an array full of that type.
+With 1 type, an array template fits an array full of that type, or an empty array.
 ```javascript
 MyProjectName.Outline( "arrayOfStrings*", [ "string", "..." ] )
 ```  
 The array `["hi","there","everyone"]` will fit "arrayOfStrings*".  
+The array `[]` will also fit "arrayOfStrings*". The empty array always fits an array template.  
 `[1,2,3]` will not, and `[1,"hi",3]` will not.  
-Only an array full of strings will fit `"arrayOfStrings*"`.
+Only an array full of strings or an empty array will fit `"arrayOfStrings*"`.
 
 Multiple names followed by the etcetera operator (`"..."`) make an array template fitting an array whose types fit that pattern:
 ```javascript

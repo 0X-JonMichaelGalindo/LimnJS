@@ -15,6 +15,7 @@ There are 13 primitive types in LimnJS:
 - string
 - symbol
 - undefined
+- unset
 
 There are some oddities in this list.  
 
@@ -39,6 +40,7 @@ For example, arrays can be made with: `new Array()` or `[1,2,3]` or `Array.from(
 - string: `var s = "";`
 - symbol: `var s = Symbol();`
 - undefined: `var u = undefined;`
+- unset: Varies. See the [unset](#unset) documentation below.
 
 Why are LimnJS's primitives so different from JavaScript and TypeScript?  
 
@@ -70,13 +72,11 @@ An outline union mfits any of the outlines in its list.
 
 ### Outline Intersections
 
-Note: This syntax is problematic and may be changed! I do not recommend using it for now.
-
 Object outlines can be intersected to fit the properties of both.  
 ```javascript
 MyApp.Outline( "hasA*", { "a": "any" } );
 MyApp.Outline( "hasB*", { "b": "any" } );
-MyApp.Outline( "hasAB*", "hasA*" + "hasB*" );
+MyApp.Outline( "hasAB*", "hasA*&hasB*" );
 ```  
 The `"hasAB*"` outline requires everything from `"hasA*"` and everything from `"hasB*"`.  
 The object `{a:42,b:true}` would fit `"hasAB*"`.  
@@ -108,7 +108,7 @@ Here is the `".seven*"` primitive defined using an arrow function.
 MyApp.Outline( ".seven*", n => n === 7 );
 ```
 
-Behind the scenes, LimnJS primitives work exactly like custom primitives.  
+Behind the scenes, LimnJS primitives work exactly like custom primitives (except for `"unset"`).  
 Here are their definitions:  
 (You couldn't define these yourself, because custom outlines must end in `"*"`.)
 ```javascript
@@ -127,6 +127,7 @@ Outline( "object", o => ( typeof o === "object" &&
 Outline( "string", s => ( typeof s === "string" ) );
 Outline( "symbol", s => ( typeof s === "symbol" ) );
 Outline( "undefined", u => ( typeof u === "undefined" ) );
+Outline( "unset", () => false ); //unset is handled differently
 
 Outline( "BigInt64Array", n => n instanceof BigInt64Array );
 Outline( "BigUint64Array", n => n instanceof BigUint64Array );
@@ -177,6 +178,112 @@ MyApp.Outline( ".undefined*", "undefined" );
 MyApp.Outline( ".void*", "null|undefined" );
 ```
 
+# Unset
+
+The unset primitive allows for optional but constrained requirements in parameters, return values, array entries, and object properties.
+
+## Unset Parameter
+
+`"unset"` in a module parameter allows that parameter and those following to remain unspecified.
+
+For example, with 1 optional parameter:
+```javascript
+MyApp( "myModule", {
+...
+parameters: [ "a:string|unset" ]
+...
+}
+```
+Here, `"myModule"` could be called as `myModule("hi!")` or `myModule()`.
+
+Among several parameters, `"unset"` creates break points after which parameters can remain unspecified.
+For example:
+```javascript
+MyApp( "myModule", {
+...
+parameters: [ 
+    "a:number",
+    "b:string|unset",
+    "c:string",
+    "d:string",
+    "e:boolean|unset"
+]
+...
+}
+```
+Means:  
+"1. If only a was passed, that's fine."  
+"2. If b was passed, then we also need c and d."  
+"3. If only a, b, c, and d were passed, that's fine."  
+
+## Unset Return
+
+Unset allows your function to not return, which happens when throwing errors.
+```javascript
+MyApp( "myModule", {
+...
+returns: "boolean|unset"
+...
+}
+```
+Here, `"myModule"` must return a boolean if it returns, but it is also permitted to not return at all.
+
+Note: No-return warnings are not implemented yet! Right now, returning `undefined` and not returning are equivalent.
+
+## Unset Object Property
+
+Unset on an object property allows that property to remain unspecified.
+
+For example:
+```javascript
+MyApp.Outline( "if-a-then-num*", { "a": "number|unset" } )
+```
+`"if-a-then-num*"` requires that, if `"a"` is specified at all, it must be a number.  
+It also allows `"a"` to go unspecified.  
+`{a:5}` will fit.  
+And `{}` will fit.  
+
+`{a:"hi!"}` will not fit.  
+`{a:undefined}` will not fit.  
+If `"a"` is specified at all, it must be a `number`.  
+
+## Unset Array Entries
+
+Unset creates break-points in array entries after which entries may go unspecified.  
+It is equivalent to saying "The array can end here if it wants to, but if it continues, it must fit this pattern."
+
+For example:
+```javascript
+MyApp.Outline( "one-or-five-entries*", [ "any", "any|unset", "any", "any", "any" ] );
+```
+The array above will fit an array with 1 entry, or 5+ entries, but nothing in between.  
+`[7]` will fit. Index 0 is 7, and index 1 is `"unset"`. `"unset"` breaks the array matching, since we reach the array's end.  
+`[7,7,7,7,7, ...]` will fit, because indices 0 through 4 fit the `"any"` type.    
+
+`[7,7,7]` will not fit.  
+Indices 0, 1, and 2 fit the `"any"` type, but index 3 is `"unset"`.  
+`"one-or-five-entries*"` requires that index 3 be of type `"any"`.
+
+For example, to require an array either be empty or start with 3 numbers:
+```javascript
+MyApp.Outline( "three-nums-if-anything*", [ "number|unset", "number", "number" ] );
+```
+
+## Unset Array Template Entries
+
+Note: This behavior is inconsistent / unintuitive and may be changed! I do not recommend using it for now.
+
+Unset is ignored in array templates.
+
+For example:
+```javascript
+MyApp.Outline( "str-nums*", [ "boolean", "string|unset", "number", "..." ] );
+```
+Is identical to:
+```javascript
+MyApp.Outline( "str-nums*", [ "boolean", "string", "number", "..." ] );
+```
+This is because matching a pattern after a break renders the next pattern element ambiguous.
 
 # Recursive Definitions
 

@@ -67,7 +67,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		noBuildEvent = false;
 
 	var illegalNameCharacters = /[^/\w\d_\-.]|\.\./gi,
-		illegalOutlineCharacters = /[^/\w\d_\-.*()|]|\.\./gi,
+		illegalOutlineCharacters = /[^/\w\d_\-.*()|&]|\.\./gi,
 		illegalDirectoryCharacters = /[^/\w\d.\-]/gi;
 
 	//check out what's loaded already, load the first waiting limn.
@@ -266,7 +266,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 			ignore[ name ] = true;
 			let dependencyNames = Object.values( def.imports || {} );
 			for( let n of dependencyNames )
-				if( ! ignore[ n ] ) {
+				if( ! ignore[ n ] &&
+					! ignore[ n.replace( /\//g, "." ) ] ) {
 					let readyOrName = checkReady( n, ignore );
 					if( readyOrName !== true ) return readyOrName;
 				}
@@ -291,20 +292,40 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		else if( def.parameters ) {
 			let pdefs = def.parameters;
 			if( pdefs.length !== params.length ) {
-				if( params.length === 0 ) {
-					console.error( `${caller } did not pass any parameters to ${name}, but` +
-						` ${name} expected ` + pdefs.join( ", " ) )
+				let unsettables = false;
+				for( let pdef of pdefs ) {
+					if( isUnset( pdef.split( ":" ).pop() ) ) {
+						unsettables = true;
+						break;
+					}
 				}
-				else {
-					const manyOrFew = params.length > pdefs.length ?
-						"too many" : "too few";
-					console.error( `${caller} passed ${manyOrFew} parameters to ${name}.`,
-						`\n${caller} passed: `, ...params, 
-						`\n\n but ${name} expected: `, pdefs.join(", ") );
+				if( unsettables === false ) {
+					if( params.length === 0 ) {
+						console.error( `${caller } did not pass any parameters to ${name}, but` +
+							` ${name} expected ` + pdefs.join( ", " ) )
+					}
+					else {
+						const manyOrFew = params.length > pdefs.length ?
+							"too many" : "too few";
+						console.error( `${caller} passed ${manyOrFew} parameters to ${name}.`,
+							`\n${caller} passed: `, ...params, 
+							`\n\n but ${name} expected: `, pdefs.join(", ") );
+					}
+					throw "Parameter Documentation Violation";
 				}
-				throw "Parameter Documentation Violation";
 			}
-			else for( let i=0; i<pdefs.length; i++ ) {
+			for( let i=0; i<pdefs.length; i++ ) {
+				if( i === params.length ) {
+					if( isUnset( pdefs[ i ].split( ":" ).pop() ) )
+						return true;
+					else {
+						const manyOrFew = "too few";
+						console.error( `${caller} passed ${manyOrFew} parameters to ${name}.`,
+							`\n${caller} passed: `, ...params, 
+							`\n\n but ${name} expected: `, pdefs.join(", ") );
+						throw "Parameter Documentation Violation";
+					}
+				}
 				if( fitsOutline( params[ i ], pdefs[ i ] ) === false ) {
 					console.error( `${caller} passed these parameters to ${name}: `, ...params,
 						`\n\nBut parameter ${i} violated ${name}'s parameter documentation:`, params[ i ],
@@ -864,6 +885,10 @@ ${LimnAlias}( "${fullName}", {
 					"\nFor any other built-in Javascript object, please use the \"object\" type." +
 					"\nFor example, Blobs, Images, ArrayBuffers, WeakMaps, Sets, and Maps may all be referred to as \"object\"s, or " +
 					"\n, if you like, you may define an outline listing their methods you intend to use.";
+			else if( outline.indexOf( "&" ) > -1 &&
+				outline.indexOf( "|" ) > -1 ) {
+					return `Outlines may not mix intersections and unions. Tried to mix: ${outline}`
+				}
 			else return true;
 		}
 		//pure check
@@ -914,6 +939,28 @@ ${LimnAlias}( "${fullName}", {
 		return false;
 	}
 
+	function isUnset( outline, history ) {
+		if( ! history ) history = {};
+		if( typeof outline === "string" ) {
+			if( outline in history ) return false;
+			else history[ outline ] = true;
+
+			if( outline === "unset" ) return true;
+			else if( outline.indexOf( "|" ) > -1 ) {
+				const unions = outline.split( "|" );
+				for( let u of unions )
+					if( isUnset( u ) ) return true;
+				return false;
+			}
+			else if( outline.indexOf( "*" ) > -1 ) {
+				let o = outlines[ outline ];
+				if( isUnset( o ) ) return true;
+				else return false;
+			}
+		}
+		else return false;
+	}
+
 	function isIdentity( outline, history ) {
 		if( ! history ) history = {};
 		if( typeof outline === "string" &&
@@ -955,6 +1002,7 @@ ${LimnAlias}( "${fullName}", {
 			"string": s => ( typeof s === "string" ),
 			"symbol": s => ( typeof s === "symbol" ),
 			"undefined": u => ( typeof u === "undefined" ),
+			"unset": () => false, //handled by logic
 
 			"BigInt64Array": n => n instanceof BigInt64Array,
 			"BigUint64Array": n => n instanceof BigUint64Array,
@@ -1105,6 +1153,7 @@ ${LimnAlias}( "${fullName}", {
 		}
 	}
 
+	window.fitsOutline =
 	function fitsOutline( target, outline, fitHistories ) {
 		if( ! fitHistories ) fitHistories = fitTerminators.makeTargetFitHistory();
 		const targetFitHistory = fitTerminators.getTargetFitHistory( target, fitHistories );
@@ -1136,27 +1185,33 @@ ${LimnAlias}( "${fullName}", {
 				}
 				return false;
 			}
+			//reference to intersection
+			else if( outline.indexOf( "&" ) > -1 ) {
+				let checkedOutlines = {};
+				for( let o of outline.split( "&" ) ) {
+					//re-checking the same outline will return true
+					//	due to recursion history testing
+					//	not a problem here, but why be wasteful?
+					if( checkedOutlines[ o ] ) continue;
+					checkedOutlines[ o ] = true;
+					if( fitsOutline( target, o, fitHistories ) === false )
+						return false;
+				}
+				return true;
+			}
 			//reference to function outline
 			else if( outline.length > 3 && outline.indexOf( "()*" ) > -1 ) {
 				return O.types[ "function" ]( target );
 			}
-			//reference to intersection or outline
+			//reference to outline
 			else if( outline.indexOf( "*" ) > -1 ) {
-				const intersect = outline.match( /\*/g );
-				//reference to intersection
-				if( intersect.length > 1 ) {
-					for( let m of intersect )
-						if( ! fitsOutline( target, m, fitHistories ) )
-							return false;
-					return true;
-				}
 				//reference to outline
-				else if( outline in outlines )
+				if( outline in outlines )
 					return fitsOutline( target, outlines[ outline ], fitHistories );
 				else return false;
 			}
 		}
-		//pure check
+		//pure check (primitive check)
 		else if( typeof outline === "function" ) {
 			return !! outline( target );
 		}
@@ -1178,18 +1233,29 @@ ${LimnAlias}( "${fullName}", {
 				}
 			}
 			else {
-				if( target.length !== outline.length )
-					return false;
-				else {
-					for( let i=0; i<outline.length; i++ ) {
-						if( ! fitsOutline(
-							target[ i ],
-							outline[ i ],
-							fitHistories
-						) ) return false;
-					}
-					return true;
+				if( target.length !== outline.length ) {
+					let unsetting = false;
+					for( let o of outline )
+						if( isUnset( o ) ) {
+							unsetting = true;
+							break;
+						}
+					if( unsetting === false )
+						return false;
 				}
+				for( let i=0; i<outline.length; i++ ) {
+					if( i === target.length ) {
+						if( isUnset( outline[ i ] ) )
+							break;
+						else return false;
+					}
+					else if( ! fitsOutline(
+						target[ i ],
+						outline[ i ],
+						fitHistories
+					) ) return false;
+				}
+				return true;
 			}
 		}
 		//documented function outline
@@ -1203,8 +1269,11 @@ ${LimnAlias}( "${fullName}", {
 			else {
 				let outlineKeys = Object.keys( outline );
 				for( let key of outlineKeys ) {
-					if( !( key in target ) )
-						return false;
+					if( !( key in target ) ) {
+						if( isUnset( outline[ key ] ) )
+							continue;
+						else return false;
+					}
 					else if( ! fitsOutline(
 							target[ key ], 
 							outline[ key ],
@@ -1387,6 +1456,7 @@ ${LimnAlias}( "${fullName}", {
 	}
 
 	var methodOutlineKey = {};
+	window.getOutline =
 	function getOutline( name ) {
 		name = name.replace( /\//g, "." );
 		if( outlines.hasOwnProperty( name ) ) {
@@ -1413,6 +1483,7 @@ ${LimnAlias}( "${fullName}", {
 				return false; //malformed outline or undefined name
 			}
 			else {
+				//TODO: Rework outline intersections to use & instead of just chaining *
 				//might be first-time lookup of joined outline
 				let names = name.split( "*" );
 				if( names.length === 2 ) {
@@ -1433,7 +1504,8 @@ ${LimnAlias}( "${fullName}", {
 					for( let i=0; i<names.length-1; i++ ) {
 						let n = names[ i ];
 						if( n.indexOf( ":" ) > -1 ) n = n.split( ":" )[ 1 ];
-						if( n.indexOf("*") === -1 ) n += "*";
+						if( n.indexOf( "*" ) === -1 ) n += "*";
+						console.log( "Getting ", n );
 						let addDef = getOutline( n );
 						if( addDef === false )
 							return false; //joined on undefined outline
@@ -1463,6 +1535,7 @@ ${LimnAlias}( "${fullName}", {
 			[ /"string"/g, "<i>string</i>" ],
 			[ /"symbol"/g, "<i>symbol</i>" ],
 			[ /"undefined"/g, "<i>undefined</i>" ],
+			[ /"unset"/g, "<i>unset</i>" ],
 
 			[ /"Uint8ClampedArray"/g, "<i>Uint8ClampedArray</i>" ],
 			[ /"Uint8Array"/g, "<i>Uint8Array</i>" ],
@@ -1478,7 +1551,7 @@ ${LimnAlias}( "${fullName}", {
 		];
 	
 	function formatLimnaryName( nt ) {
-		nt = nt.replace( /\//g, "." );
+		nt = nt.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
 		let baseNt = nt.replace( /("[/\w\d_\-.()*]+")[^:]/gi, "$1" ),
 			formattedBaseNt = baseNt.replace( /"/g, "" ),
 			formattedNt = "",
@@ -1515,13 +1588,16 @@ ${LimnAlias}( "${fullName}", {
 	*/
 	function extractTypeDependencies( type, set ) {
 		if( typeof type === "string" ) {
-			type = type.replace( /\//g, "." );
+			type = type.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
 			type = type.replace( /"/g, "" );
 			if( type.indexOf( ":" ) > -1 )
 				type = type.split( ":" )[ 1 ];
 			
 			if( type.indexOf( "|" ) > -1 ) {
 				extractTypeDependencies( type.split( "|" ), set )
+			}
+			else if( type.indexOf( "&" ) > -1 ) {
+				extractTypeDependencies( type.split( "&" ), set )
 			}
 			else if( O.types[ type ] || type === "..." ) return;
 			else set.add( type );
@@ -1536,15 +1612,17 @@ ${LimnAlias}( "${fullName}", {
 				extractTypeDependencies( t, set );
 		}
 	}
+	window.formatType =
 	function formatType( t ) {
-		t = t.replace( /\//g, "." );
+		t = t.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
 		t = t.replace( /\s+/g, "" );
-		for( let tt of typeTypes )
+		for( let tt of typeTypes ) {
 			t = t.replace( tt[ 0 ], tt[ 1 ] );
+		}
 		//if there are any named types, look them up
 		let namedTypes = t.match(
 				//this match is based on illegalOutlineCharacters
-				/"[\w\d_\-.()*|]+"[^:]/gi
+				/"[\w\d_\-.()*|&]+"[^:]|"[\w\d_\-.()*]+"$/gi
 			);
 		if( namedTypes ) {
 			let replacers = {};
@@ -1560,6 +1638,11 @@ ${LimnAlias}( "${fullName}", {
 				t = t.replace( nt, rid );
 				if( nt.indexOf( "|" ) > -1 ) {
 					let splitNt = nt.replace( /([^"])\|([^"])/g, "$1\"|\"$2" ),
+						formattedNt = " <div class=\"wrap\">&lt; " + formatType( splitNt ) + " &gt;</div> ";
+					replacers[ rid ] = formattedNt;
+				}
+				else if( nt.indexOf( "&" ) > -1 ) {
+					let splitNt = nt.replace( /([^"])&([^"])/g, "$1\"&\"$2" ),
 						formattedNt = " <div class=\"wrap\">&lt; " + formatType( splitNt ) + " &gt;</div> ";
 					replacers[ rid ] = formattedNt;
 				}
@@ -1630,7 +1713,7 @@ ${LimnAlias}( "${fullName}", {
 	}
 	function formatTypeOrLimnary( name ) {
 		if( ! name.replace ) console.error( name );
-		name = name.replace( /\//g, "." );
+		name = name.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
 		if( name.indexOf( "|" ) > -1 ||
 			O.types.hasOwnProperty( name ) )
 			name = formatType( Limn.Outline( name ) ).trim();
@@ -1639,7 +1722,7 @@ ${LimnAlias}( "${fullName}", {
 	}
 	
 	function getDetail( name ) {
-		name = name.replace( /\//g, "." );
+		name = name.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
 		let sum = "";
 		if( name.indexOf( "*" ) === -1 ||
 			( name.length > 3 &&
@@ -1655,7 +1738,7 @@ ${LimnAlias}( "${fullName}", {
 		return sum;
 	}
 	function getSummary( nameOrType ) {
-		nameOrType = nameOrType.replace( /\//g, "." );
+		nameOrType = nameOrType.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
 		let sum = null;
 		if( nameOrType.indexOf( "*" ) > -1 )
 			sum = summarize( outlines[ nameOrType ] );
@@ -1670,6 +1753,7 @@ ${LimnAlias}( "${fullName}", {
 			"(", ")" - used to indicate a function outline.
 		This entire Outline notion is only used during development.
 	*/
+	window.Outline =
 	window[ LimnAlias ].Outline = function( name, def, desc ) {
 		let literalName = name;
 		name = name.replace( /\//g, "." );
@@ -1683,6 +1767,13 @@ ${LimnAlias}( "${fullName}", {
 						"\" >";
 				return joinedNames;
 			}
+			else if( name.indexOf( "&" ) > -1 ) {
+				let nameOptions = name.split( "&" ),
+					joinedNames = "< \"" + 
+						nameOptions.join( "\" & \"" ) + 
+						"\" >";
+				return joinedNames;
+			}
 			else if( name.length > 3 &&
 				name.indexOf( "()*" ) === name.length - 3 ) {
 				let summary = getSummary( name );
@@ -1691,7 +1782,9 @@ ${LimnAlias}( "${fullName}", {
 			else {
 				let outline = getOutline( name );
 				if( outline ) {
-					if( typeof outline === "string" && outline.indexOf( "|" ) > -1 )
+					if( typeof outline === "string" && 
+						( outline.indexOf( "|" ) > -1 ||
+						outline.indexOf( "&" ) > -1 ) )
 						return Limn.Outline( outline );
 					else return JSON.stringify( outline );
 				}
@@ -1730,8 +1823,13 @@ ${LimnAlias}( "${fullName}", {
 				console.error( "Tried to redefine previously defined outline: ", name );
 				throw "Inherent Outline Definition Violation";
 			}
-			else if( name.match( /[*]/g ).length === 1 &&
-				name.length > 3 &&
+			else if( name.indexOf( "|" ) > -1 || 
+				name.indexOf( "&" ) > -1 ) {
+				console.error( "Outline names may not contain & or |. " + 
+					"Those characters are only valid in outline union and intersection definitions.", name );
+				throw "Inherent Outline Definition Violation";
+			}
+			else if( name.length > 3 &&
 				name.indexOf( "()*" ) === name.length-3 ) {
 				//it's a function outline defintion
 				outlines[ name ] = def;
@@ -1747,24 +1845,9 @@ ${LimnAlias}( "${fullName}", {
 					throw "Inherent Outline Definition Violation";
 				}
 				else {
-					let stars = name.split("*");
-					if( stars.length > 2 ||
-						stars[ 1 ].length > 0 ) {
-						console.error( "Tried to define an outline with a joint name: ", name,
-							"\nJoints are used to mix outline definitions, but not as names.\n",
-							"For example, having outlines \"typeA*\" and \"typeB*\", you might ",
-							"then define \"mixedType*\": \"typeA*\"+\"typeB*\".\n",
-							"\"mixedType*\" would then only fit an object that fit both \"typeA*\" ",
-							"and \"typeB*\".\n",
-							"However, the name of \"mixedType*\" would always contain only a single ",
-							"\"*\" as its last character." );
-						throw "Inherent Outline Definition Violation";
-					}
-					else {
-						outlines[ name ] = def;
-						if( desc ) LimnaryDescriptions[ name ] = desc;
-						outlinesPendingURL.push( name );
-					}
+					outlines[ name ] = def;
+					if( desc ) LimnaryDescriptions[ name ] = desc;
+					outlinesPendingURL.push( name );
 				}
 			}
 		}
