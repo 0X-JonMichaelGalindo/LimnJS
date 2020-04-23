@@ -1153,7 +1153,6 @@ ${LimnAlias}( "${fullName}", {
 		}
 	}
 
-	window.fitsOutline =
 	function fitsOutline( target, outline, fitHistories ) {
 		if( ! fitHistories ) fitHistories = fitTerminators.makeTargetFitHistory();
 		const targetFitHistory = fitTerminators.getTargetFitHistory( target, fitHistories );
@@ -1456,7 +1455,6 @@ ${LimnAlias}( "${fullName}", {
 	}
 
 	var methodOutlineKey = {};
-	window.getOutline =
 	function getOutline( name ) {
 		name = name.replace( /\//g, "." );
 		if( outlines.hasOwnProperty( name ) ) {
@@ -1612,7 +1610,6 @@ ${LimnAlias}( "${fullName}", {
 				extractTypeDependencies( t, set );
 		}
 	}
-	window.formatType =
 	function formatType( t ) {
 		t = t.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
 		t = t.replace( /\s+/g, "" );
@@ -1753,7 +1750,6 @@ ${LimnAlias}( "${fullName}", {
 			"(", ")" - used to indicate a function outline.
 		This entire Outline notion is only used during development.
 	*/
-	window.Outline =
 	window[ LimnAlias ].Outline = function( name, def, desc ) {
 		let literalName = name;
 		name = name.replace( /\//g, "." );

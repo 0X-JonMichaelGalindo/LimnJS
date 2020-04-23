@@ -1,7 +1,7 @@
 
 ### Outline Primitives
 
-There are 13 primitive types in LimnJS:
+There are 14 primitive types in LimnJS:
 - any
 - array
 - bigint
@@ -312,15 +312,18 @@ M.Outline( "ob*", {
 } ); 
 
 let a = { alike: null };
+
+fits( a, "ob*" ); //false
+
 a.alike = a;
 
 fits( a, "ob*" ); //true
 ```
 
-However, the identity outline creates obfuscated "any" definitions:
+However, the identity outline creates obfuscated "any" union definitions:
 
 ```javascript
-//Here, a cursory glance implies a*, b*, and c* are numbers
+//A cursory glance implies a*, b*, and c* are numbers
 M.Outline( "a*", "number|b*" );
 M.Outline( "b*", "number|c*" );
 M.Outline( "c*", "number|a*" );
@@ -330,6 +333,6 @@ M.Outline( "c*", "number|a*" );
 fits( false, "a*" ); //true
 ```
 
-When using recursive definitions, carefully examine LimnJS's code explorer for unexpected identity outlines.
+When using recursive unions, carefully examine LimnJS's code explorer for unexpected identity outlines.
 
 ![Obfuscated identity outline in code explorer.](img/identity-any.png)
