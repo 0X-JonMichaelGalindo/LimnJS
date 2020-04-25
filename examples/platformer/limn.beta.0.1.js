@@ -717,7 +717,12 @@ ${LimnAlias}( "${fullName}", {
 									passLimns[ localName ] = new Proxy( passMethod, {
 										apply: async ( target, thisArg, params ) => {
 											throwOnParameters( realLimnaryName, params, passDef, callerName );
-											let value = passMethod.apply( thisArg, params );
+											let value;
+											try { value = await passMethod.apply( thisArg, params );
+											} catch( e ) {
+												console.error( `${realLimnaryName} threw an error when called by ${callerName}.` );
+												throw e;
+											}
 											return throwOnReturn( realLimnaryName, value, passDef.returns, callerName, params );
 										}
 									} );
@@ -726,7 +731,12 @@ ${LimnAlias}( "${fullName}", {
 									passLimns[ localName ] = new Proxy( passMethod, {
 										apply: ( target, thisArg, params ) => {
 											throwOnParameters( realLimnaryName, params, passDef, callerName );
-											let value = passMethod.apply( thisArg, params );
+											let value;
+											try { value = passMethod.apply( thisArg, params );
+											} catch( e ) {
+												console.error( `${realLimnaryName} threw an error when called by ${callerName}.` );
+												throw e;
+											}
 											return throwOnReturn( realLimnaryName, value, passDef.returns, callerName, params );
 										}
 									} );
@@ -735,11 +745,21 @@ ${LimnAlias}( "${fullName}", {
 					}
 				}
 
-				let code = `return (\n` + 
+				const logProxy = ( ...logs ) => {
+						console.log( `${fullName} is logging to the console:` );
+						console.log( ...logs );
+					},
+					consoleProxy = new Proxy( console, {
+						get( target, getting ) {
+							if( getting === "log" ) return logProxy;
+							else return target[ log ];
+						}
+					} ),
+					code = `return (\n` + 
 						def.factory.toLocaleString() + 
 					`\n)();`,
-					compiled = Function( LimnAlias, "imports", code ),
-					method = compiled( badAccessError, passLimns );
+					compiled = Function( LimnAlias, "imports", "console", code ),
+					method = compiled( badAccessError, passLimns, consoleProxy );
 					
 				if( typeof method !== "function" ) {
 					if( method instanceof Promise ||
@@ -768,7 +788,12 @@ ${LimnAlias}( "${fullName}", {
 					Limnaries[ fullName ] = new Proxy( method, {
 						apply: async ( target, thisArg, params ) => {
 							throwOnParameters( fullName, params, def, callerName );
-							let value = await method.apply( thisArg, params );
+							let value;
+							try { value = await method.apply( thisArg, params );
+							} catch( e ) {
+								console.error( `${fullName} threw an error when called by ${callerName}.` );
+								throw e;
+							}
 							return throwOnReturn( fullName, value, def.returns, callerName, params );
 						}
 					} )
@@ -778,7 +803,12 @@ ${LimnAlias}( "${fullName}", {
 					Limnaries[ fullName ] = new Proxy( method, {
 						apply: ( target, thisArg, params ) => {
 							throwOnParameters( fullName, params, def, callerName );
-							let value = method.apply( thisArg, params );
+							let value;
+							try { value = method.apply( thisArg, params );
+							} catch( e ) {
+								console.error( `${fullName} threw an error when called by ${callerName}.` );
+								throw e;
+							}
 							return throwOnReturn( fullName, value, def.returns, callerName, params );
 						}
 					} );
@@ -937,6 +967,59 @@ ${LimnAlias}( "${fullName}", {
 			}
 		}
 		return false;
+	}
+
+	function getLexicalOutlines( outline, set ) {
+		if( ! set ) set = new Set();
+
+		if( set.has( outline ) ) return set;
+
+		if( outline.indexOf( "&" ) > -1 )
+			return false;
+		else if( outline.indexOf( "|" ) > -1 ) {
+			for( let t of outline.split( "|" ) )
+				getLexicalOutlines( t, set );
+		}
+		else if( outline.indexOf( "*" ) > -1 ) {
+			set.add( outline );
+			let o = outlines[ outline ];
+			if( typeof o === "string" )
+				getLexicalOutlines( o, set );
+		}
+		return set;
+	}
+
+	/*
+	mystery and outline must both be strings
+	Check for lexical equality.
+	Meaning: "type1*" might be a "string",
+	And "type2*" might be a "string",
+	but they are not lexically equal, only
+	functionally.
+	*/
+	function isLexicalOutline( mystery, outline, history ) {
+		if( typeof outline !== "string" ||
+			typeof mystery !== "string" )
+			return false;
+
+		if( ! history ) history = {};
+		if( mystery in history ) return false;
+		else history[ mystery ] = true;
+
+		if( mystery === outline ) return true;
+		else if( mystery.indexOf( "|" ) > -1 ) {
+			const unions = mystery.split( "|" );
+			for( let u of unions )
+				if( isLexicalOutline( u, outline, history ) )
+					return true;
+			return false;
+		}
+		else if( mystery.indexOf( "*" ) > -1 ) {
+			let o = outlines[ outline ];
+			if( isLexicalOutline( o, outline, history ) )
+				return true;
+			else return false;
+		}
 	}
 
 	function isUnset( outline, history ) {
@@ -1610,6 +1693,7 @@ ${LimnAlias}( "${fullName}", {
 				extractTypeDependencies( t, set );
 		}
 	}
+	
 	function formatType( t ) {
 		t = t.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
 		t = t.replace( /\s+/g, "" );
@@ -1750,6 +1834,7 @@ ${LimnAlias}( "${fullName}", {
 			"(", ")" - used to indicate a function outline.
 		This entire Outline notion is only used during development.
 	*/
+	
 	window[ LimnAlias ].Outline = function( name, def, desc ) {
 		let literalName = name;
 		name = name.replace( /\//g, "." );
@@ -2275,32 +2360,35 @@ ${[
 			//add bases for outlines if not already there
 			if( def.parameters )
 				for( let parameter of def.parameters ) {
-					let [ prm, tp ] = parameter.split( ":" );
-					links.outlines[ tp ] = links.outlines[ tp ] || makeOutline();
-					if( links.outlines[ tp ].acceptedBy[ name ] )
-						links.outlines[ tp ].acceptedBy[ name ] += ", " + prm;
-					else links.outlines[ tp ].acceptedBy[ name ] = prm;
+					let [ prm, tpo ] = parameter.split( ":" );
+					let tps = getLexicalOutlines( tpo );
+					for( let tp of tps ) {
+						links.outlines[ tp ] = links.outlines[ tp ] || makeOutline();
+						if( links.outlines[ tp ].acceptedBy[ name ] )
+							links.outlines[ tp ].acceptedBy[ name ] += ", " + prm;
+						else links.outlines[ tp ].acceptedBy[ name ] = prm;
+					}
 				}
 			if( def.listen ) {
-				let listens = def.listen.indexOf( "|" ) > -1 ?
-					def.listen.split( "|" ) : [ def.listen ];
+				let listens = getLexicalOutlines( def.listen );
 				for( let l of listens ) {
 					links.outlines[ l ] = links.outlines[ l ] || makeOutline();
 					links.outlines[ l ].listenedBy[ name ] = true;
 				}
 			}
 			if( def.emits ) {
-				let emits = def.emits.indexOf( "|" ) > -1 ?
-					def.emits.split( "|" ) : [ def.emits ];
+				let emits = getLexicalOutlines( def.emits );
 				for( let e of emits ) {
 					links.outlines[ e ] = links.outlines[ e ] || makeOutline();
 					links.outlines[ e ].emittedBy[ name ] = true;
 				}
 			}
 			if( def.returns ) {
-				let tp = def.returns;
-				links.outlines[ tp ] = links.outlines[ tp ] || makeOutline();
-				links.outlines[ tp ].returnedBy[ name ] = true;
+				let returns = getLexicalOutlines( def.returns );
+				for( let r of returns ) {
+					links.outlines[ r ] = links.outlines[ r ] || makeOutline();
+					links.outlines[ r ].returnedBy[ name ] = true;
+				}
 			}
 
 			for( let localSubName in def.imports ) {
@@ -2352,11 +2440,11 @@ ${[
 			for( let t of dependencies ) {
 				links.outlines[ t ] = links.outlines[ t ] || makeOutline();
 				if( def ) {
-					if( def.returns === t )
+					if( isLexicalOutline( def.returns, t ) )
 						links.outlines[ t ].returnedBy[ name ] = true;
 					else for( let p of def.parameters ) {
 						let [ pName, pType ] = p.split( ":" );
-						if( pType === t ) {
+						if( isLexicalOutline( pType, t ) ) {
 							if( links.outlines[ t ].acceptedBy[ name ] ) {
 								links.outlines[ t ].acceptedBy[ name ] += ", " + pName;
 							}
