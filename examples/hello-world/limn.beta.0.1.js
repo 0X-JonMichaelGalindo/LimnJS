@@ -1539,7 +1539,11 @@ ${LimnAlias}( "${fullName}", {
 
 	var methodOutlineKey = {};
 	function getOutline( name ) {
-		name = name.replace( /\//g, "." );
+		name = name.replace( /\//g, "." ).
+			replace( /\s+/g, "" ).
+			replace( /^[|&]+/, "" ).
+			replace( /[|&]+$/, "" ).
+			replace( /\:[|&]+/, ":" );
 		if( outlines.hasOwnProperty( name ) ) {
 			const out = outlines[ name ];
 			if( typeof out === "function" ) return "primitive";
@@ -1837,8 +1841,17 @@ ${LimnAlias}( "${fullName}", {
 	
 	window[ LimnAlias ].Outline = function( name, def, desc ) {
 		let literalName = name;
-		name = name.replace( /\//g, "." );
+		name = name.replace( /\//g, "." ).
+			replace( /\s+/g, "" ).
+			replace( /^[|&]+/, "" ).
+			replace( /[|&]+$/, "" ).
+			replace( /\:[|&]+/, ":" );
 		LiteralNames[ name ] = literalName;
+
+		if( def && typeof def === "string" )
+			def = def.replace( /\s+/g, "" ).
+				replace( /^[|&]+/, "" ).
+				replace( /[|&]+$/, "" );
 
 		if( def === undefined ) {
 			if( name.indexOf( "|" ) > -1 ) {
