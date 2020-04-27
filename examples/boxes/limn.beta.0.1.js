@@ -895,6 +895,12 @@ ${LimnAlias}( "${fullName}", {
 	function isValidOutline( outline ) {
 		//reference to: primitive, union, intersection, or outline
 		if( typeof outline === "string" ) {
+			outline = outline.
+				replace( /\//gm, "." ).
+				replace( /[\s\r\n]+/gm, "" ).
+				replace( /^[|&]+/m, "" ).
+				replace( /[|&]+$/m, "" ).
+				replace( /\:[|&]+/m, ":" );
 			let illegalOutlines = outline.match( illegalOutlineCharacters ),
 				illegalLimns = outline.match( illegalNameCharacters );
 			if( illegalOutlines && illegalLimns ) 
@@ -936,6 +942,14 @@ ${LimnAlias}( "${fullName}", {
 				let validity = isValidOutline( entry );
 				if( validity !== true )
 					return validity;
+				else if( typeof outline[ i ] === "string" ) {
+					outline[ i ] = outline[ i ].
+						replace( /\//gm, "." ).
+						replace( /[\s\r\n]+/gm, "" ).
+						replace( /^[|&]+/m, "" ).
+						replace( /[|&]+$/m, "" ).
+						replace( /\:[|&]+/m, ":" )
+				}
 			}
 			return true;
 		}
@@ -948,6 +962,14 @@ ${LimnAlias}( "${fullName}", {
 				let validity = isValidOutline( outline[ key ] );
 				if( validity !== true )
 					return validity;
+				else if( typeof outline[ key ] === "string" ) {
+					outline[ key ] = outline[ key ].
+						replace( /\//gm, "." ).
+						replace( /[\s\r\n]+/gm, "" ).
+						replace( /^[|&]+/m, "" ).
+						replace( /[|&]+$/m, "" ).
+						replace( /\:[|&]+/m, ":" )
+				}
 			}
 			return true;
 		}
@@ -1076,12 +1098,26 @@ ${LimnAlias}( "${fullName}", {
 			"bigint": b => typeof b === "bigint",
 			"boolean": b => typeof b === "boolean",
 			"function": f => typeof f === "function",
-			"NaN": n => ( typeof n === "number" && isNaN( n ) ),
+			"infinity":  n => ( 
+					typeof n === "number" && 
+					n === Infinity
+				),
+			"NaN": n => ( 
+					typeof n === "number" && 
+					isNaN( n ) 
+				),
 			"never": () => false,
 			"null": n => n === null,
-			"number": n => ( typeof n === "number" && ! isNaN( n ) ),
-			"object": o => ( typeof o === "object" && 
-				o !== null && ! Array.isArray( o ) ),
+			"number": n => ( 
+					typeof n === "number" && 
+					( ! isNaN( n ) ) &&
+					n !== Infinity
+				),
+			"object": o => ( 
+					typeof o === "object" && 
+					o !== null && 
+					! Array.isArray( o ) 
+				),
 			"string": s => ( typeof s === "string" ),
 			"symbol": s => ( typeof s === "symbol" ),
 			"undefined": u => ( typeof u === "undefined" ),
@@ -1236,6 +1272,7 @@ ${LimnAlias}( "${fullName}", {
 		}
 	}
 
+	window.fitsOutline =
 	function fitsOutline( target, outline, fitHistories ) {
 		if( ! fitHistories ) fitHistories = fitTerminators.makeTargetFitHistory();
 		const targetFitHistory = fitTerminators.getTargetFitHistory( target, fitHistories );
@@ -1248,9 +1285,12 @@ ${LimnAlias}( "${fullName}", {
 		//reference to: primitive, union, intersection, or outline
 		if( typeof outline === "string" ) {
 			outline = outline.
-					replace( /\//g, "." ).
-					replace( /"/g, "" ).
-					split( ":" ).pop();
+					split( ":" ).pop().
+					replace( /\//gm, "." ).
+					replace( /"/gm, "" ).
+					replace( /[\s\r\n]+/gm, "" ).
+					replace( /^[|&]+/m, "" ).
+					replace( /[|&]+$/m, "" );
 			//reference to primitive
 			if( outline in O.types )
 				return O.types[ outline ]( target );
@@ -1539,11 +1579,12 @@ ${LimnAlias}( "${fullName}", {
 
 	var methodOutlineKey = {};
 	function getOutline( name ) {
-		name = name.replace( /\//g, "." ).
-			replace( /\s+/g, "" ).
-			replace( /^[|&]+/, "" ).
-			replace( /[|&]+$/, "" ).
-			replace( /\:[|&]+/, ":" );
+		name = name.
+			replace( /\//gm, "." ).
+			replace( /[\s\r\n]+/gm, "" ).
+			replace( /^[|&]+/m, "" ).
+			replace( /[|&]+$/m, "" ).
+			replace( /\:[|&]+/m, ":" );
 		if( outlines.hasOwnProperty( name ) ) {
 			const out = outlines[ name ];
 			if( typeof out === "function" ) return "primitive";
@@ -1611,6 +1652,7 @@ ${LimnAlias}( "${fullName}", {
 			[ /"bigint"/g, "<i>bigint</i>" ],
 			[ /"boolean"/g, "<i>boolean</i>" ],
 			[ /"function"/g, "<i>function</i>" ],
+			[ /"infinity"/g, "<i>infinity</i>" ],
 			[ /"NaN"/g, "<i>NaN</i>" ],
 			[ /"never"/g, "<i>never</i>" ],
 			[ /"null"/g, "<i>null</i>" ],
@@ -1636,7 +1678,13 @@ ${LimnAlias}( "${fullName}", {
 		];
 	
 	function formatLimnaryName( nt ) {
-		nt = nt.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
+		nt = nt.
+				replace( /([^<])\//g, "$1." ).
+				replace( /^\//g, "." ).
+				replace( /[\s\r\n]+/gm, "" ).
+				replace( /^[|&]+/m, "" ).
+				replace( /[|&]+$/m, "" ).
+				replace( /\:[|&]+/m, ":" );
 		let baseNt = nt.replace( /("[/\w\d_\-.()*]+")[^:]/gi, "$1" ),
 			formattedBaseNt = baseNt.replace( /"/g, "" ),
 			formattedNt = "",
@@ -1700,7 +1748,7 @@ ${LimnAlias}( "${fullName}", {
 	
 	function formatType( t ) {
 		t = t.replace( /([^<])\//g, "$1." ).replace( /^\//g, "." );
-		t = t.replace( /\s+/g, "" );
+		t = t.replace( /[\s\r\n]+/g, "" );
 		for( let tt of typeTypes ) {
 			t = t.replace( tt[ 0 ], tt[ 1 ] );
 		}
@@ -1841,17 +1889,17 @@ ${LimnAlias}( "${fullName}", {
 	
 	window[ LimnAlias ].Outline = function( name, def, desc ) {
 		let literalName = name;
-		name = name.replace( /\//g, "." ).
-			replace( /\s+/g, "" ).
-			replace( /^[|&]+/, "" ).
-			replace( /[|&]+$/, "" ).
-			replace( /\:[|&]+/, ":" );
+		name = name.replace( /\//gm, "." ).
+			replace( /[\s\r\n]+/gm, "" ).
+			replace( /^[|&]+/m, "" ).
+			replace( /[|&]+$/m, "" ).
+			replace( /\:[|&]+/m, ":" );
 		LiteralNames[ name ] = literalName;
 
 		if( def && typeof def === "string" )
-			def = def.replace( /\s+/g, "" ).
-				replace( /^[|&]+/, "" ).
-				replace( /[|&]+$/, "" );
+			def = def.replace( /[\s\r\n]+/gm, "" ).
+				replace( /^[|&]+/m, "" ).
+				replace( /[|&]+$/m, "" );
 
 		if( def === undefined ) {
 			if( name.indexOf( "|" ) > -1 ) {

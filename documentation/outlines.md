@@ -1,12 +1,13 @@
 
 ### Outline Primitives
 
-There are 14 primitive types in LimnJS:
+There are 15 primitive types in LimnJS:
 - any
 - array
 - bigint
 - boolean
 - function
+- infinity
 - NaN
 - never
 - null
@@ -32,6 +33,7 @@ For example, arrays can be made with: `new Array()` or `[1,2,3]` or `Array.from(
 - bigint: `var b = BigInt( 22 );`
 - boolean: `var b = true;`
 - function: `var f = function(){}`
+- infinity: `var i = Infinity;`
 - NaN: `var N = NaN;`
 - never: Impossible. Nothing satisfies `"never"`
 - null: `var n = null;`
@@ -45,7 +47,10 @@ For example, arrays can be made with: `new Array()` or `[1,2,3]` or `Array.from(
 Why are LimnJS's primitives so different from JavaScript and TypeScript?  
 
 1. Because outlines are so permissive, LimnJS needs stricter primitives.
-2. Plus, these distinct primitives eliminate hard-to-track-down errors in the kind of code I write, specifically.  
+2. These distinct primitives eliminate hard-to-track-down errors.  
+    Code, that expects numbers especially statistics, should be able to
+    throw an error on receiving NaN or Infinity. In vanilla JavaScript,
+    no such error is possible.
 
 In addition to these primitives, you may use the following array-like JavaScript objects as types.  
 However! These will also fit type:"object", so be aware.
@@ -118,10 +123,21 @@ Outline( "array", a => Array.isArray( a ) );
 Outline( "bigint", b => typeof b === "bigint" );
 Outline( "boolean", b => typeof b === "boolean" );
 Outline( "function", f => typeof f === "function" );
-Outline( "NaN", n => ( typeof n === "number" && isNaN( n ) ) );
+Outline( "infinity", n => ( 
+        typeof n === "number" &&
+        n === Infinity
+    ) );
+Outline( "NaN", n => ( 
+        typeof n === "number" &&
+        isNaN( n ) 
+    ) );
 Outline( "never", () => false );
 Outline( "null", n => n === null );
-Outline( "number", n => ( typeof n === "number" && ! isNaN( n ) ) );
+Outline( "number", n => ( 
+        typeof n === "number" && 
+        ! isNaN( n ) &&
+        n !== Infinity
+    ) );
 Outline( "object", o => ( typeof o === "object" && 
                 o !== null && ! Array.isArray( o ) ) );
 Outline( "string", s => ( typeof s === "string" ) );
@@ -156,7 +172,7 @@ If you prefer, please use the following outline definitions to imitate a more fa
 MyApp.Outline( ".bigint*", "bigint" );
 MyApp.Outline( ".boolean*", "boolean" );
 MyApp.Outline( ".function*", "function" );
-MyApp.Outline( ".number*", "number|NaN" );
+MyApp.Outline( ".number*", "number|NaN|Infinity" );
 MyApp.Outline( ".object*", "object|array|null" );
 MyApp.Outline( ".string*", "string" );
 MyApp.Outline( ".symbol*", "symbol" );

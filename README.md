@@ -721,12 +721,13 @@ For example, if our function above retuned "undefined", we would see:
 
 ### Outline Primitives
 
-There are 14 primitive types in LimnJS:
+There are 15 primitive types in LimnJS:
 - any
 - array
 - bigint
 - boolean
 - function
+- infinity
 - NaN
 - never
 - null
