@@ -326,11 +326,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 						throw "Parameter Documentation Violation";
 					}
 				}
-				if( fitsOutline( params[ i ], pdefs[ i ] ) === false ) {
+				const fitReport = fitsOutline( params[ i ], pdefs[ i ] );
+				if( fitReport !== true ) {
 					console.error( `${caller} passed these parameters to ${name}: `, ...params,
 						`\n\nBut parameter ${i} violated ${name}'s parameter documentation:`, params[ i ],
 						`"\n ${name} was expecting parameter ${i}, called ${pdefs[ i ].split(":")[0]},`,
-						` to be a: ${pdefs[ i ].split(":")[1]}`
+						` to be a: ${pdefs[ i ].split(":")[1]}.\n`+
+						`It did not fit because:\n${fitReport}`
 					);
 					throw "Parameter Documentation Violation";
 				}
@@ -349,11 +351,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 	function throwOnReturn( name, value, rdef, caller, params ) {
 		name = name.replace( /\//g, "." );
 		if( rdef ) {
-			let validity = fitsOutline( value, rdef );
-			if( validity ) return value;
+			let fitReport = fitsOutline( value, rdef );
+			if( fitReport === true ) 
+				return value;
 			else { 
 				console.error( `${name} returned a value violating its documentation.`,
 					`\n${name} returned `, value, ", but it expected to return ", rdef,
+					`\nThe return did not fit because:\n${fitReport}`,
 					`\nThis happened when ${caller} passed these parameters (if any): `, ...params );
 				throw "Return Value Documentation Violation";
 			}
@@ -423,9 +427,11 @@ This happened when ${caller} called ${name} with these parameters (if any): `, .
 				" its documentation ", outline );
 			throw "Emit Documentation Violation";
 		}
-		if( fitsOutline( detail, eventName ) === false ) {
+		const fitReport = fitsOutline( detail, eventName );
+		if( fitReport !== true ) {
 			console.error( name, " tried to emit detail ", detail, 
-				" violating its declared emitting outline ", eventName );
+				" violating its declared emitting outline ", eventName,
+				`\nThe detail did not fit the outline because:\n${fitReport}` );
 			throw "Emit Documentation Violation";
 		}
 		else return true;
@@ -1272,7 +1278,32 @@ ${LimnAlias}( "${fullName}", {
 		}
 	}
 
-	window.fitsOutline =
+	function stringify( thing ) {
+		if( typeof thing === "function" )
+			return thing.toLocaleString();
+		else if( typeof thing === "string" )
+			return `'${thing}'`;
+		else if( typeof thing === "object" ) {
+			let s = "{";
+			for( let k in thing )
+				s += `'${k}':${stringify(thing[k])},`;
+			if( s.charAt( s.length-1 ) === "," )
+				s = s.substring( 0, s.length-1 );
+			s += "}";
+			return s;
+		}
+		else if( typeof thing === "array" ) {
+			let s = "["
+			for( let e of thing )
+				s += stringify(e) + ",";
+			if( s.charAt( s.length-1 ) === "," )
+				s = s.substring( 0, s.length-1 );
+			s += "]";
+			return s;
+		}
+		else return `<<${thing.toString()}>>`;
+	}
+
 	function fitsOutline( target, outline, fitHistories ) {
 		if( ! fitHistories ) fitHistories = fitTerminators.makeTargetFitHistory();
 		const targetFitHistory = fitTerminators.getTargetFitHistory( target, fitHistories );
@@ -1281,6 +1312,8 @@ ${LimnAlias}( "${fullName}", {
 		if( fitCheck.checked === true ) return true;
 		else fitCheck.checked = true;
 		
+		const targetString = stringify( target ),
+			outlineString = stringify( outline );
 
 		//reference to: primitive, union, intersection, or outline
 		if( typeof outline === "string" ) {
@@ -1292,20 +1325,26 @@ ${LimnAlias}( "${fullName}", {
 					replace( /^[|&]+/m, "" ).
 					replace( /[|&]+$/m, "" );
 			//reference to primitive
-			if( outline in O.types )
-				return O.types[ outline ]( target );
+			if( outline in O.types ) {
+				const fit = O.types[ outline ]( target );
+				if( fit ) return true;
+				else return ` ${targetString} is not a primitive "${outline}".\n`;
+			}
 			//reference to union
 			else if( outline.indexOf( "|" ) > -1 ) {
-				let checkedOutlines = {};
+				let checkedOutlines = {},
+					report = "";
 				for( let o of outline.split( "|" ) ) {
 					//re-checking the same outline will return true
 					//	due to recursion history testing
 					if( checkedOutlines[ o ] ) continue;
 					checkedOutlines[ o ] = true;
-					if( fitsOutline( target, o, fitHistories ) )
+					const rep = fitsOutline( target, o, fitHistories );
+					if( rep === true )
 						return true;
+					else report += ` ${targetString} is not a "${o}" because:\n${rep}`;
 				}
-				return false;
+				return report + "\n";
 			}
 			//reference to intersection
 			else if( outline.indexOf( "&" ) > -1 ) {
@@ -1316,41 +1355,59 @@ ${LimnAlias}( "${fullName}", {
 					//	not a problem here, but why be wasteful?
 					if( checkedOutlines[ o ] ) continue;
 					checkedOutlines[ o ] = true;
-					if( fitsOutline( target, o, fitHistories ) === false )
-						return false;
+					const rep = fitsOutline( target, o, fitHistories );
+					if( rep !== true ) {
+						return ` ${targetString} is not a "${o}" because:\n${rep}\n`;
+					}
 				}
 				return true;
 			}
 			//reference to function outline
-			else if( outline.length > 3 && outline.indexOf( "()*" ) > -1 ) {
-				return O.types[ "function" ]( target );
+			else if( outline.length > 3 && 
+				outline.indexOf( "()*" ) > -1 ) {
+				const rep = O.types[ "function" ]( target );
+				if( rep ) return true;
+				else return ` ${targetString} is not a "function" to fit "${outline}".\n`
 			}
 			//reference to outline
 			else if( outline.indexOf( "*" ) > -1 ) {
 				//reference to outline
-				if( outline in outlines )
-					return fitsOutline( target, outlines[ outline ], fitHistories );
-				else return false;
+				if( outline in outlines ) {
+					const rep = fitsOutline( target, outlines[ outline ], fitHistories );
+					if( rep === true ) return true;
+					else return ` ${targetString} is not a "${outline}" because:\n${rep}\n`
+				}
+				else return ` ${targetString} referenced undefined outline "${outline}".\n`;
 			}
 		}
 		//pure check (primitive check)
 		else if( typeof outline === "function" ) {
-			return !! outline( target );
+			const fit = !! outline( target );
+			if( fit ) return true;
+			else return ` ${targetString} does not fit the custom primitive: ${outlineString}.`;
 		}
 		//array template
 		else if( Array.isArray( outline ) ) {
-			if( ! Array.isArray( target ) ) return false;
+			if( ! Array.isArray( target ) ) 
+				return ` ${targetString} is not an "array".\n`;
 			if( outline[ outline.length - 1 ] === "..." ) {
 				if( target.length > 0 &&
-					( target.length % ( outline.length - 1 ) ) !== 0 )
-						return false;
+					( target.length % 
+					( outline.length - 1 ) 
+					) !== 0 )
+						return ` ${targetString} had the wrong number of entries to fit "${outlineString}". Needed multiple of ${outline.length} but had ${target.length}.\n`;
 				else {
-					for( let i=0; i<target.length; i++ )
-						if( ! fitsOutline( 
+					for( let i=0; i<target.length; i++ ) {
+						const rep = fitsOutline( 
 								target[ i ], 
 								outline[ i % ( outline.length - 1 ) ],
 								fitHistories
-							) ) return false;
+							)
+						if( rep !== true ) {
+							const outlineString = stringify(outline[ i % ( outline.length - 1 ) ]);
+							return ` in ${targetString}, entry ${i} did not fit outline entry ${i % ( outline.length - 1 )}: "${outlineString}" because:\n${rep}\n`;
+						}
+					}
 					return true;
 				}
 			}
@@ -1362,50 +1419,72 @@ ${LimnAlias}( "${fullName}", {
 							unsetting = true;
 							break;
 						}
-					if( unsetting === false )
-						return false;
+					if( unsetting === false ) {
+						return ` ${targetString} had the wrong number of entries to fit "${outlineString}". Needed ${outline.length} but had ${target.length}.\n`;
+					}
 				}
 				for( let i=0; i<outline.length; i++ ) {
+					const outlineString = stringify( outline[ i ] );
 					if( i === target.length ) {
 						if( isUnset( outline[ i ] ) )
 							break;
-						else return false;
+						else {
+							return ` ${targetString} ended at entry ${i}, which is not defined as "unset" in outline entry ${i}: "${outlineString}".\n`;
+						}
 					}
-					else if( ! fitsOutline(
-						target[ i ],
-						outline[ i ],
-						fitHistories
-					) ) return false;
+					else {
+						const rep = fitsOutline(
+							target[ i ],
+							outline[ i ],
+							fitHistories
+						)
+						if( rep !== true ) {
+							return ` in ${targetString}, entry ${i} did not fit outline entry ${i}: "${outlineString}" because:\n${rep}\n`;
+						}
+					}
 				}
 				return true;
 			}
 		}
 		//documented function outline
-		else if( FunctionOutlines.get( outline ) !== undefined &&
-			typeof target === "function" ) return true;
+		else if( FunctionOutlines.get( outline ) !== undefined ) {
+			if( typeof target === "function" )
+				return true;
+			else return ` ${targetString} is not a "function" to fit "${outlineString}".\n`;
+		}
 		//object template
 		else if( typeof outline === "object" ) {
 			//cannot call keys on non-object or null
-			if( typeof target !== "object" ||
-				target === null ) return false;
+			if( typeof target !== "object" )
+				return ` ${targetString} is not an "object" to fit "${outlineString}".\n`;
+			else if( target === null ) 
+				return ` ${targetString} is "null", not an "object" to fit "${outlineString}".\n`;
 			else {
 				let outlineKeys = Object.keys( outline );
 				for( let key of outlineKeys ) {
+					const outlineString = stringify( outline[ key ] );
 					if( !( key in target ) ) {
 						if( isUnset( outline[ key ] ) )
 							continue;
-						else return false;
+						else {
+							return ` in ${targetString}, required property "${key}" is missing but should have been "${outlineString}".\n`;
+						}
 					}
-					else if( ! fitsOutline(
-							target[ key ], 
-							outline[ key ],
-							fitHistories
-						) ) return false;
+					else {
+						const rep = fitsOutline(
+								target[ key ], 
+								outline[ key ],
+								fitHistories
+							)
+						if( rep !== true  ) {
+							return ` in ${targetString}, property "${key}" did not fit "${outlineString}" because:\n${rep}\n`;
+						}
+					}
 				}
 				return true;
 			}
 		}
-		else return false;
+		else return ` Could not test ${targetString} at all, because outline "${outlineString}" was not a string, array, function, or object.`;
 	}
 
 	function testFitsOutline() {
@@ -1454,11 +1533,16 @@ ${LimnAlias}( "${fullName}", {
 		for( let t in tests ) {
 			let got = fitsOutline( tests[ t ], t );
 			if( got !== true ) {
-				console.error( tests[ t ], " failed to fit ", t );
+				console.error( tests[ t ], " failed to fit ", t,
+					`because:\n${got}\n` );
 			}
-			if( ! fitsOutline( tests[ t ], "any" ) )
-				console.error( tests[ t ], " (from test ", t, ") failed to fit \"any\"." );
-			if( fitsOutline( tests[ t ], "never" ) )
+			const fitsAny = fitsOutline( tests[ t ], "any" );
+			if( fitsAny !== true )
+				console.error( tests[ t ], 
+					" (from test ", t, ") failed to fit \"any\" because: ", 
+					fitsAny );
+			const fitsNever = fitsOutline( tests[ t ], "never" );
+			if( fitsNever === true )
 				console.error( tests[ t ], " (from test ", t, ") fit \"never\"." );
 		}
 
@@ -1470,11 +1554,20 @@ ${LimnAlias}( "${fullName}", {
 			Limn.Outline( customName2, customName );
 			let got = fitsOutline( tests[ t ], customName );
 			if( got !== true ) {
-				console.error( tests[ t ], " failed to fit ", customName );
+				console.error( 
+					tests[ t ], 
+					" failed to fit ", 
+					customName,
+					`because:\n${got}\n` );
 			}
 			let got2 = fitsOutline( tests[ t ], customName2 );
 			if( got2 !== true ) {
-				console.error( tests[ t ], " failed to fit proxy ", customName2 );
+				console.error( 
+					tests[ t ], 
+					" failed to fit proxy ", 
+					customName2,
+					`because:\n${got2}\n`
+				);
 			}
 		}
 
