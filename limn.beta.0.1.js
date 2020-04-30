@@ -31,6 +31,154 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 "use strict";
 
 ( async function LimnInit() {
+	/*
+		Structure of This Library
+
+		1. Global Constants
+		2. Loading + Configuration
+			- getNextWaitingLimn()
+			- becomeLimn()
+			- load()
+			- loadIfNecessary()
+			- waitForLimnary()
+			- acknowledgeLimnaryParse()
+			- waitForAllReady()
+			- checkReady()
+		3. Error-Throwers
+			- throwOnParameters()
+			- throwOnReturn()
+			- throwOnEmit()
+			- throwOnListenerDefinition()
+			- throwOnReturnsDefinition()
+			- throwOnParametersDefinition()
+			- throwOnEmitsDefinition()
+		4. Limn Global Function ()
+			# define new limn
+				# validate names
+				# validate definition
+					# check for factory
+					# validate returns
+					# validate listens
+					# validate parameters
+					# validate emits
+				# populate imports
+					# validate names
+					# load import via Limn Global Function
+					# proxy loaded import:
+						# throw on bad parameters
+						# throw on bad returns
+				# build factory
+					# proxy console:
+						# ID limn logging
+					# build with scoped proxies
+					# validate build
+				# proxy factory for external code
+					# throw on bad parameters
+					# throw on bad returns
+				# add listeners
+				# acknowledge parse
+				# await dependency loading
+			# fetch limn
+				# load source if necessary
+		5. Outlines
+			- isValidOutline()
+			- outlinesIntersect()
+			- getLexicalOutlines()
+			- isLexicalOutline()
+			- isIdentity()
+			- Outline Types (Primitives)
+			- Fits Outline
+				# TODO: Explain this (needs more than structure)
+				- fitTerminators
+					- makeTargetFitHistory()
+					- makeOutlineFitHistory()
+					- makeFitCheck()
+					- getOutlineFitCheck()
+					- getTargetFitHistory()
+				- stringify()
+				- fitsOutline()
+				- testFitsOutline()
+				- mixBintoA()
+			- getOutline()
+			- Outline Formats (HTML)
+			- formatLimnaryName()
+			- extractTypeDependencies()
+			- formatType()
+			- summarize()
+			- formatTypeOrLimnary()
+			- getDetail()
+			- getSummary()
+			- Global Outline Function ()
+		6. Build
+			- promise polyfill (anonyco's SPromiseMeSpeedJS)
+			- checkIfUsingEmit()
+			- Build Archaic ()
+			- Build Brief ()
+		7. Code Explorer
+			- getNewWindow()
+			- Global Explore Function ()
+				# create popup
+				# analyze source code dependencies
+				# sort alphabetically
+				- make(), write(), add()
+				- makeTab()
+					# onclick - populate explorer panel
+				- listDetails()
+					# verbose parameters or type definition
+				- listSupports()
+					# verbose dependencies
+				- limnCellNeeds()
+					# make down-stream dependencies graph
+				- limnCellNeededBy()
+					# make up-stream dependencies graph
+				- clearGraphLites()
+				- makeCell()
+					# make a graph
+					# cell, head, title, hover, click, tail
+				- getIngoerStack(), getOutgoerStack()
+					addNeedsGraph(), addNeededByGraph()
+				- expand()
+					# For each tree entry:
+						# add tree menu label
+						# build outline description
+							# add menu-label preview
+							# click (info|launch)
+							# title
+							# url + description
+							# details: outline definition
+							# dependencies
+						# build limn description
+							# add menu-label preview
+							# onclick (info|launch)
+							# title
+							# url + description
+							# details: parameters + returns
+							# dependencies
+							# dependency graph
+							# raw factory code
+						# repeat for children
+					# add stylesheet
+					# insert container
+					# insert menu
+					# build build panel
+						# container, button, name, version, globalname
+						# onclick: build, activate download link
+					# insert build panel
+					# insert panel
+					# insert tabs row
+					# insert code block
+				# dispatch global event
+				- Code Explorer CSS
+					# theme
+					# build panel
+					# menu
+					# tabs row
+					# main explorer
+					# floating previews
+					# graph
+
+	*/
+
 	var __VERSION__ = "beta.0.1";
 
 	var urls = {},
@@ -755,9 +903,14 @@ ${LimnAlias}( "${fullName}", {
 						console.log( `${fullName} is logging to the console:` );
 						console.log( ...logs );
 					},
+					errorProxy = ( ...errors ) => {
+						console.error( `${fullName} is erroring to the console:` );
+						console.error( ...errors );
+					},
 					consoleProxy = new Proxy( console, {
 						get( target, getting ) {
 							if( getting === "log" ) return logProxy;
+							else if( getting === "error" ) return errorProxy;
 							else return target[ log ];
 						}
 					} ),
@@ -1301,7 +1454,7 @@ ${LimnAlias}( "${fullName}", {
 			s += "]";
 			return s;
 		}
-		else return `<<${thing.toString()}>>`;
+		else return thing.toString();
 	}
 
 	function fitsOutline( target, outline, fitHistories ) {

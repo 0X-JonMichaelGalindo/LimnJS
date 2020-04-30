@@ -20,7 +20,7 @@ There are 15 primitive types in LimnJS:
 
 There are some oddities in this list.  
 
-In vanilla JavaScript: "null" is an "object", "NaN" is a "number", and "array" is an "object".  
+For example, in vanilla JavaScript: "null" is an "object", "NaN" is a "number", and "array" is an "object".  
 In LimnJS, all three are unique primitives.  
 If a parameter requires a number, it will throw an error on receiving NaN.  
 If a parameter requires an object, it will throw an error on receiving an array.
@@ -48,9 +48,10 @@ Why are LimnJS's primitives so different from JavaScript and TypeScript?
 
 1. Because outlines are so permissive, LimnJS needs stricter primitives.
 2. These distinct primitives eliminate hard-to-track-down errors.  
-    Code, that expects numbers especially statistics, should be able to
-    throw an error on receiving NaN or Infinity. In vanilla JavaScript,
-    no such error is possible.
+    Code that expects numbers, especially statistics, should be able to
+    throw an error on receiving NaN or Infinity.  
+    LimnJS provides these errors implicitly.  
+    When writing a statistical method that expects NaN or Infinity, the programmer must specify `"number|NaN|infinity"` as the parameter description, a clear reminder to handle these cases in-code.
 
 In addition to these primitives, you may use the following array-like JavaScript objects as types.  
 However! These will also fit type:"object", so be aware.
@@ -72,12 +73,35 @@ An outline union uses `"|"` to separate several outlines.
 ```javascript
 MyApp.Outline( "lots*", "string|boolean|object|function" );
 ```  
-An outline union mfits any of the outlines in its list.  
+An outline union fits any of the outlines in its list.  
 `"lots*"` in the example above will fit a string, a boolean, an object, or a function.
+
+Unions can contain trailing or leading pipes (`"|"`):  
+This is valid:
+```javascript
+MyApp.Outline( "lots*", "|string|boolean|" );
+```  
+
+Unions can also contain whitespace.  
+
+Using JavaScript template literals, we can define unions with greater readability.  
+(Read about template literals at [MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals).)  
+This is valid:
+```javascript
+MyApp.Outline( 
+    "lots*", 
+    `
+    | string
+    | boolean
+    | object
+    | function
+    `
+);
+```  
 
 ### Outline Intersections
 
-Object outlines can be intersected to fit the properties of both.  
+Object outlines can be intersected to fit the properties of both using the ampersand ("&").  
 ```javascript
 MyApp.Outline( "hasA*", { "a": "any" } );
 MyApp.Outline( "hasB*", { "b": "any" } );
@@ -85,6 +109,33 @@ MyApp.Outline( "hasAB*", "hasA*&hasB*" );
 ```  
 The `"hasAB*"` outline requires everything from `"hasA*"` and everything from `"hasB*"`.  
 The object `{a:42,b:true}` would fit `"hasAB*"`.  
+
+Like unions, intersections may contain trailing or leading ampersands ("&") as well as whitespace.  
+This is valid:
+```javascript
+MyApp.Outline(
+    "hasSeveral*",
+    `
+    & hasA*
+    & hasB*
+    & hasC*
+    & hasD*
+    `
+)
+```
+
+This is also valid:
+```javascript
+MyApp.Outline(
+    "hasSeveral*",
+    `
+    hasA* &
+    hasB* &
+    hasC* &
+    hasD* &
+    `
+)
+```
 
 Note:
 
@@ -96,21 +147,21 @@ In LimnJS, intersections have all properties of both outlines.
 Create your own primitives by using functions as outline definitions.  
 ```javascript
 MyApp.Outline( 
-    ".seven*",
+    "seven*",
     function( target ) { 
         if( target === 7 ) return true;
         else return false;
     }
 );
 ```  
-An object will be passed to your function.  
-If your function returns something truthy (read about truthy values on [MDN](https://developer.mozilla.org/en-US/docs/Glossary/Truthy)), that object will fit your outline.  
-In the example above, only the number `7` will fit the outline `".seven*"`.  
+A target will be passed to your function.  
+If your function returns something truthy (read about truthy values on [MDN](https://developer.mozilla.org/en-US/docs/Glossary/Truthy)), the target will fit your outline.  
+In the example above, only the number `7` will fit the outline `"seven*"`.  
 
-Using arrow functions (read about arrow functions on [MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions)), primitives can be defined faster.  
-Here is the `".seven*"` primitive defined using an arrow function.
+Using arrow functions (read about arrow functions on [MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions)), primitives can be defined concisely.  
+Here is the `"seven*"` primitive defined using an arrow function.
 ```javascript
-MyApp.Outline( ".seven*", n => n === 7 );
+MyApp.Outline( "seven*", n => n === 7 );
 ```
 
 Behind the scenes, LimnJS primitives work exactly like custom primitives (except for `"unset"`).  
@@ -138,8 +189,11 @@ Outline( "number", n => (
         ! isNaN( n ) &&
         n !== Infinity
     ) );
-Outline( "object", o => ( typeof o === "object" && 
-                o !== null && ! Array.isArray( o ) ) );
+Outline( "object", o => ( 
+        typeof o === "object" && 
+        o !== null && 
+        ! Array.isArray( o ) 
+    ) );
 Outline( "string", s => ( typeof s === "string" ) );
 Outline( "symbol", s => ( typeof s === "symbol" ) );
 Outline( "undefined", u => ( typeof u === "undefined" ) );
@@ -161,7 +215,7 @@ Outline( "Uint32Array", n => n instanceof Uint32Array );
 Note:  
 
 Try to avoid using custom primitives.  
-In LimnJS's documentation, `".seven*"` will simply be described as "primitive", which is not helpful.
+In LimnJS's documentation, `"seven*"` will simply be described as "primitive", which is not helpful.
 
 ### Familiar Primitive Imitation
 
@@ -169,14 +223,18 @@ If you prefer, please use the following outline definitions to imitate a more fa
 
 ```javascript
 //JavaScript primitives
+
+//"any" has no JavaScript equivalent
 MyApp.Outline( ".bigint*", "bigint" );
 MyApp.Outline( ".boolean*", "boolean" );
 MyApp.Outline( ".function*", "function" );
-MyApp.Outline( ".number*", "number|NaN|Infinity" );
+MyApp.Outline( ".number*", "number|NaN|infinity" );
+//"never" has no JavaScript equivalent
 MyApp.Outline( ".object*", "object|array|null" );
 MyApp.Outline( ".string*", "string" );
 MyApp.Outline( ".symbol*", "symbol" );
 MyApp.Outline( ".undefined*", "undefined" );
+//"unset" has no JavaScript equivalent
 ```
 
 ```javascript
@@ -184,19 +242,23 @@ MyApp.Outline( ".undefined*", "undefined" );
 MyApp.Outline( ".any*", "any" );
 MyApp.Outline( ".array*", "array|null|undefined" );
 MyApp.Outline( ".boolean*", "boolean|null|undefined" );
+MyApp.Outline( ".bigint*", "bigint|null|undefined" );
 MyApp.Outline( ".function*", "function" );
 MyApp.Outline( ".never*", "never" );
 MyApp.Outline( ".null*", "null" );
-MyApp.Outline( ".number*", "number|NaN|null|undefined" );
+MyApp.Outline( ".number*", "number|NaN|infinity|null|undefined" );
 MyApp.Outline( ".object*", "object|array" );
 MyApp.Outline( ".string*", "string|null|undefined" );
 MyApp.Outline( ".undefined*", "undefined" );
+//"unset" has no TypeScript equivalent
 MyApp.Outline( ".void*", "null|undefined" );
 ```
 
 # Unset
 
-The unset primitive allows for optional but constrained requirements in parameters, return values, array entries, and object properties.
+The unset primitive allows for optional but constrained requirements in parameters, return values, array entries, and object properties.  
+
+It also allows designation of forbidden keys in object properties.
 
 ## Unset Parameter
 
@@ -248,7 +310,19 @@ Note: No-return warnings are not implemented yet! Right now, returning `undefine
 
 ## Unset Object Property
 
-Unset on an object property allows that property to remain unspecified.
+Unset on an object property forbids use of the associated key.  
+For example:  
+```javascript
+MyApp.Outline(
+    "no-a-here",
+    { "a": "unset" }
+)
+```  
+`{a:5}` will not fit.  
+`{a:undefined}` will not fit.  
+Any object with the key `"a"` will fail to fit the outline `"no-a-here"`.  
+
+Unset in a union on an object property allows that property to remain unspecified.
 
 For example:
 ```javascript
@@ -256,9 +330,9 @@ MyApp.Outline( "if-a-then-num*", { "a": "number|unset" } )
 ```
 `"if-a-then-num*"` requires that, if `"a"` is specified at all, it must be a number.  
 It also allows `"a"` to go unspecified.  
-`{a:5}` will fit.  
-And `{}` will fit.  
 
+`{a:5}` will fit. (`"a"` is a number.)  
+And `{}` will fit. (`"a"` is unspecified.)  
 `{a:"hi!"}` will not fit.  
 `{a:undefined}` will not fit.  
 If `"a"` is specified at all, it must be a `number`.  
@@ -270,11 +344,19 @@ It is equivalent to saying "The array can end here if it wants to, but if it con
 
 For example:
 ```javascript
-MyApp.Outline( "one-or-five-entries*", [ "any", "any|unset", "any", "any", "any" ] );
+MyApp.Outline( 
+    "one-or-five-entries*", 
+    [ "any", "any|unset", "any", "any", "any" ] 
+);
 ```
 The array above will fit an array with 1 entry, or 5+ entries, but nothing in between.  
-`[7]` will fit. Index 0 is 7, and index 1 is `"unset"`. `"unset"` breaks the array matching, since we reach the array's end.  
-`[7,7,7,7,7, ...]` will fit, because indices 0 through 4 fit the `"any"` type.    
+
+`[7]` will fit.  
+Index 0 is 7, and index 1 is `"unset"`.  
+Index 1's `"unset"` breaks the pattern matching, since we reach the array's end.  
+
+`[7,7,7,7,7]` will fit.  
+Indices 0 through 4 fit the `"any"` type.    
 
 `[7,7,7]` will not fit.  
 Indices 0, 1, and 2 fit the `"any"` type, but index 3 is `"unset"`.  
@@ -282,7 +364,10 @@ Indices 0, 1, and 2 fit the `"any"` type, but index 3 is `"unset"`.
 
 For example, to require an array either be empty or start with 3 numbers:
 ```javascript
-MyApp.Outline( "three-nums-if-anything*", [ "number|unset", "number", "number" ] );
+MyApp.Outline( 
+    "three-nums-if-anything*", 
+    [ "number|unset", "number", "number" ] 
+);
 ```
 
 ## Unset Array Template Entries
