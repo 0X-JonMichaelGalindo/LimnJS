@@ -1431,7 +1431,15 @@ ${LimnAlias}( "${fullName}", {
 		}
 	}
 
-	function stringify( thing ) {
+	function stringify( thing, ignore ) {
+		if( ! ignore ) ignore = new Set();
+
+		if( typeof thing === "object" ) {
+			if( ignore.has( thing ) )
+				return "...";
+			else ignore.add( thing );
+		}
+
 		if( typeof thing === "function" )
 			return thing.toLocaleString();
 		else if( typeof thing === "string" )
@@ -1439,7 +1447,7 @@ ${LimnAlias}( "${fullName}", {
 		else if( typeof thing === "object" ) {
 			let s = "{";
 			for( let k in thing )
-				s += `'${k}':${stringify(thing[k])},`;
+				s += `'${k}':${stringify(thing[k],ignore)},`;
 			if( s.charAt( s.length-1 ) === "," )
 				s = s.substring( 0, s.length-1 );
 			s += "}";
@@ -1448,7 +1456,7 @@ ${LimnAlias}( "${fullName}", {
 		else if( typeof thing === "array" ) {
 			let s = "["
 			for( let e of thing )
-				s += stringify(e) + ",";
+				s += stringify(e,ignore) + ",";
 			if( s.charAt( s.length-1 ) === "," )
 				s = s.substring( 0, s.length-1 );
 			s += "]";
@@ -1465,7 +1473,7 @@ ${LimnAlias}( "${fullName}", {
 		if( fitCheck.checked === true ) return true;
 		else fitCheck.checked = true;
 		
-		const targetString = stringify( target ),
+		const targetString = target + "",
 			outlineString = stringify( outline );
 
 		//reference to: primitive, union, intersection, or outline
@@ -2896,10 +2904,10 @@ ${[
 						} = elementsByName[ name ];
 					mainBlock.innerHTML = "";
 					add( nameElement ).to( mainBlock );
-					if( parametersElement )
-						add( parametersElement ).to( mainBlock );
 					if( descriptionElement )
 						add( descriptionElement ).to( mainBlock );
+					if( parametersElement )
+						add( parametersElement ).to( mainBlock );
 					if( requiresElement )
 						add( requiresElement ).to( mainBlock );
 						if( needsGraphElement )
@@ -3213,8 +3221,10 @@ ${[
 						elementsByName[ fullName ].tabElement = outlineTab;
 
 						liLabel.onclick = e => {
-							if( liLabel.getClientRects()[ 0 ].width > e.offsetX )
+							if( liLabel.getClientRects()[ 0 ].width > e.offsetX ) {
 								outlineTab.onclick();
+								buildPanel.scrollIntoView();
+							}
 							else {
 								if( e.preventDefault )
 									e.preventDefault();
@@ -3363,8 +3373,10 @@ ${[
 						elementsByName[ fullName ].tabElement = methodTab;
 
 						liLabel.onclick = e => {
-							if( liLabel.getClientRects()[ 0 ].width > e.offsetX )
+							if( liLabel.getClientRects()[ 0 ].width > e.offsetX ) {
 								methodTab.onclick();
+								buildPanel.scrollIntoView();
+							}
 							else {
 								if( e.preventDefault )
 									e.preventDefault();
@@ -3390,7 +3402,7 @@ ${[
 						descEl.classList.add( "description" );
 						write( "file: \"" + urls[ fullName ] + "\"" ).to( urlEl );
 						add( urlEl ).to( descEl );
-						write( desc ).to( descEl );
+						descEl.innerHTML += desc;
 						elementsByName[ fullName ].descriptionElement = descEl;
 
 						//add parameters
@@ -3632,8 +3644,8 @@ ${[
 		background-color: var(--back-color);
 		display:grid;
 		grid-template-areas:
-			"menu main"
-			"bild main";
+			"bild main"
+			"menu main";
 		grid-template-columns: auto 1fr;
 		grid-template-rows: auto auto;
 		position:absolute;
@@ -3852,10 +3864,9 @@ ${[
 	}
 	.limn-explore .panel > .main > .description {
 		font-size:1.125rem;
-		margin:1rem;
+		margin:1rem 0;
 		padding:1rem;
 		border:1px solid var(--panel-border);
-		font-family:'Cormorant', Georgia, 'Times New Roman', Times, serif;
 	}
 	.limn-explore .panel > .main > .parameters {
 		font-family: Iosevka, 'Iosevka Web', 'Courier New', Courier, monospace;
