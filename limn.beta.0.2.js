@@ -995,22 +995,10 @@ ${LimnAlias}( "${fullName}", {
 		else {
 			let limnMethod =  Limnaries[ fullName ];
 
-			if( ! limnMethod ) {
-				return new Promise( returnLimnary => {
-					//if this is a private use of Limn, just wait for
-					//	a method to load and parse.
-					if( privateKeyOrDesc === privateCall )
-						waitForLimnary( fullName ).then( returnLimnary );
-					//if this is a public use, make sure we have all
-					//	the dependencies.
-					else waitForAllReady( fullName ).then(
-						limn => returnLimnary( limn )
-					);
-				} );
-			}
-			else {
-				return new Promise( returnLimnary => returnLimnary( limnMethod ) );
-			}
+			if( ! limnMethod &&
+				privateKeyOrDesc === privateCall )
+				return waitForLimnary( fullName );
+			else return waitForAllReady( fullName );
 		}
 	}
 
