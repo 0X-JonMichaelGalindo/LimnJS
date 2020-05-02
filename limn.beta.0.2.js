@@ -179,7 +179,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 
 	*/
 
-	var __VERSION__ = "beta.0.1";
+	var __VERSION__ = "beta.0.2";
 
 	var urls = {},
 		outlinesPendingURL = [],
