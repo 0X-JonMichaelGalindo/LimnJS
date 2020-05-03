@@ -3233,7 +3233,7 @@ ${[
 						descEl.classList.add( "description" );
 						write( "file: \"" + urls[ fullName ] + "\"" ).to( urlEl );
 						add( urlEl ).to( descEl );
-						write( desc ).to( descEl );
+						descEl.innerHTML = desc;
 						elementsByName[ fullName ].descriptionElement = descEl;
 
 						//show the details

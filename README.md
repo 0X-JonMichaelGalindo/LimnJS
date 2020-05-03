@@ -17,6 +17,10 @@ It's the best of all worlds:
 
 [![Basic Setup & Boilerplate - Hello World Web App](documentation/img/video-1.png)](https://www.youtube.com/watch?v=8CLCjBR3oW0)
 
+## Code Explorer Overview
+
+[![Code Explorer Overview](documentation/img/video-2.png)](https://www.youtube.com/watch?v=eERJbwcjg8M)
+
 # Index
 1. [Video Tutorials](#video-tutorials)
 1. [In Three Steps](#in-three-steps)
