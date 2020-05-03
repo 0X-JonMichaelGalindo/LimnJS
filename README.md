@@ -11,7 +11,14 @@ It's the best of all worlds:
 
 **preview / debug source + type enforcement + performance**
 
+# Video Tutorials
+
+## Basic Setup & Module Boilerplate - Hello World Web App
+
+[![Basic Setup & Boilerplate - Hello World Web App](documentation/img/video-1.png)](https://www.youtube.com/watch?v=8CLCjBR3oW0)
+
 # Index
+1. [Video Tutorials](#video-tutorials)
 1. [In Three Steps](#in-three-steps)
 1. [Beta](#beta)
     1. [Can I Use it?](#can-i-use-it)
@@ -40,7 +47,6 @@ It's the best of all worlds:
         12. [Array Outlines](#array-outlines)
         13. [Array Template Outlines](#array-template-outlines)
     3. [Listeners](#listeners)
-6. [Video Tutorial (Not Available!)](#video-tutorial-not-available)
 7. [Background and Trivia](#background-and-trivia)
     1. [What is "Limn"?](#what-is-"limn")
     2. [LimnJS's Outline System](#limnjss-outline-system)
@@ -992,11 +998,6 @@ await imports.emit( "Something.EventType*", "" );
 //^All listeners will finish executing before this block continues executing.
 ```  
 (The code above uses JavaScript async/await syntax. You can read about async/await on [MDN](https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Asynchronous/Async_await))
-
-# Video Tutorial (Not Available!)
-Check out a video tutorial building a simple in-browser app.
-
-(Well, there is no video yet. But there should be!)
 
 # Background and Trivia
 
