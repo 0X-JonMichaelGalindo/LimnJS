@@ -100,7 +100,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 				- testFitsOutline()
 				- mixBintoA()
 			- getOutline()
-			- Outline Formats (HTML)
+			- Outline Formats as HTML
 			- formatLimnaryName()
 			- extractTypeDependencies()
 			- formatType()
@@ -3584,7 +3584,7 @@ ${[
 		add( mainBlock ).to( panel );
 
 		if( focus ) {
-			elementsByName[ focus ].tabElement.onclick();
+			elementsByName[ focus.replace( /\//g, "." ) ].tabElement.onclick();
 		}
 	}
 

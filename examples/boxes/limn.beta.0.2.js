@@ -100,7 +100,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 				- testFitsOutline()
 				- mixBintoA()
 			- getOutline()
-			- Outline Formats (HTML)
+			- Outline Formats as HTML
 			- formatLimnaryName()
 			- extractTypeDependencies()
 			- formatType()
@@ -1247,7 +1247,8 @@ ${LimnAlias}( "${fullName}", {
 			"function": f => typeof f === "function",
 			"infinity":  n => ( 
 					typeof n === "number" && 
-					n === Infinity
+					( n === Infinity ||
+					n === -Infinity )
 				),
 			"NaN": n => ( 
 					typeof n === "number" && 
@@ -1258,7 +1259,8 @@ ${LimnAlias}( "${fullName}", {
 			"number": n => ( 
 					typeof n === "number" && 
 					( ! isNaN( n ) ) &&
-					n !== Infinity
+					n !== Infinity &&
+					n !== -Infinity
 				),
 			"object": o => ( 
 					typeof o === "object" && 
@@ -3226,14 +3228,13 @@ ${[
 						write( fullName ).to( nameBanner );
 						elementsByName[ fullName ].nameElement = nameBanner;
 
-						//add the limnary's description, if any
+						//add the outline's description, if any
 						let descEl = make( "div" ),
-							urlEl = make( "div" ),
 							desc = LimnaryDescriptions[ fullName ] || "(No description.)";
 						descEl.classList.add( "description" );
-						write( "file: \"" + urls[ fullName ] + "\"" ).to( urlEl );
-						add( urlEl ).to( descEl );
-						descEl.innerHTML = desc;
+						descEl.innerHTML = 
+							`file: "${(urls[ fullName ]||"")}"<br>` +
+							desc;
 						elementsByName[ fullName ].descriptionElement = descEl;
 
 						//show the details
@@ -3584,7 +3585,7 @@ ${[
 		add( mainBlock ).to( panel );
 
 		if( focus ) {
-			elementsByName[ focus ].tabElement.onclick();
+			elementsByName[ focus.replace( /\//g, "." ) ].tabElement.onclick();
 		}
 	}
 

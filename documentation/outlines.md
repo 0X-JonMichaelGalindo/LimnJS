@@ -24,6 +24,7 @@ For example, in vanilla JavaScript: "null" is an "object", "NaN" is a "number", 
 In LimnJS, all three are unique primitives.  
 If a parameter requires a number, it will throw an error on receiving NaN.  
 If a parameter requires an object, it will throw an error on receiving an array.
+Note that infinity fits both `+Infinity` and `-Infinity`.
 
 Examples of how to create each of these primitive types in Javascript:  
 (There are many ways to make these. 
