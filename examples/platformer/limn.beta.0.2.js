@@ -831,15 +831,22 @@ ${LimnAlias}( "${fullName}", {
 					passLimns.emit = async ( emitted, detail ) => {
 						if( throwOnEmit( fullName, emitted, detail, def.emits ) === true ) {
 							let allPromises = [];
-							for( let l of listeners[ emitted ] ) {
-								let possiblePromise = l( emitted, detail );
-								if( possiblePromise && (
-									possiblePromise instanceof Promise ||
-									( typeof possiblePromise.then === "function" )
-								) ) allPromises.push( possiblePromise );
+							if( ! listeners[ emitted ] ) {
+								console.error(
+									`Performance Warning: "${fullName}" fired event "${emitted}", which has no listeners.`
+								)
 							}
-							await Promise.all( allPromises );
-							return;
+							else {
+								for( let l of listeners[ emitted ] ) {
+									let possiblePromise = l( emitted, detail );
+									if( possiblePromise && (
+										possiblePromise instanceof Promise ||
+										( typeof possiblePromise.then === "function" )
+									) ) allPromises.push( possiblePromise );
+								}
+								await Promise.all( allPromises );
+								return;
+							}
 						}
 					}
 				}
