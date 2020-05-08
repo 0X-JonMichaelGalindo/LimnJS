@@ -914,7 +914,8 @@ ${LimnAlias}( "${fullName}", {
 							else return target[ log ];
 						}
 					} ),
-					code = `return (\n` + 
+					code = `"use strict";
+						return (\n` + 
 						def.factory.toLocaleString() + 
 					`\n)();`,
 					compiled = Function( LimnAlias, "imports", "console", code ),

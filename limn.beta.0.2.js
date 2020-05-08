@@ -914,7 +914,8 @@ ${LimnAlias}( "${fullName}", {
 							else return target[ log ];
 						}
 					} ),
-					code = `return (\n` + 
+					code = `"use strict";
+						return (\n` + 
 						def.factory.toLocaleString() + 
 					`\n)();`,
 					compiled = Function( LimnAlias, "imports", "console", code ),
@@ -1247,7 +1248,8 @@ ${LimnAlias}( "${fullName}", {
 			"function": f => typeof f === "function",
 			"infinity":  n => ( 
 					typeof n === "number" && 
-					n === Infinity
+					( n === Infinity ||
+					n === -Infinity )
 				),
 			"NaN": n => ( 
 					typeof n === "number" && 
@@ -1258,7 +1260,8 @@ ${LimnAlias}( "${fullName}", {
 			"number": n => ( 
 					typeof n === "number" && 
 					( ! isNaN( n ) ) &&
-					n !== Infinity
+					n !== Infinity &&
+					n !== -Infinity
 				),
 			"object": o => ( 
 					typeof o === "object" && 
@@ -3226,14 +3229,13 @@ ${[
 						write( fullName ).to( nameBanner );
 						elementsByName[ fullName ].nameElement = nameBanner;
 
-						//add the limnary's description, if any
+						//add the outline's description, if any
 						let descEl = make( "div" ),
-							urlEl = make( "div" ),
 							desc = LimnaryDescriptions[ fullName ] || "(No description.)";
 						descEl.classList.add( "description" );
-						write( "file: \"" + urls[ fullName ] + "\"" ).to( urlEl );
-						add( urlEl ).to( descEl );
-						descEl.innerHTML = desc;
+						descEl.innerHTML = 
+							`file: "${(urls[ fullName ]||"")}"<br>` +
+							desc;
 						elementsByName[ fullName ].descriptionElement = descEl;
 
 						//show the details
