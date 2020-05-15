@@ -38,6 +38,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		2. Loading + Configuration
 			- getNextWaitingLimn()
 			- becomeLimn()
+			- getWabtModule()
+			- compileWabtForInstantiate()
 			- load()
 			- loadIfNecessary()
 			- waitForLimnary()
@@ -212,7 +214,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		useArchaicJS = false,
 		noPromisePolyfill = false,
 		useGlobalizer = false,
-		noBuildEvent = false;
+		noBuildEvent = false; //null, true, or false
 
 	var illegalNameCharacters = /[^/\w\d_\-.]|\.\./gi,
 		illegalOutlineCharacters = /[^/\w\d_\-.*()|&]|\.\./gi,
@@ -254,7 +256,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 						archaic: archaic,
 						noPromise: noPromise,
 						rebuildGlobal: rebuildGlobal,
-						noEvent: noEvent
+						noEvent: noEvent,
 					} );
 				}
 			}
@@ -341,6 +343,72 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 	}
 	else becomeLimn( nextLimn );
 
+	//reuse 1 wabt module instance for all compiles
+	let WabtInstance = null;
+	function getWabtModule() {
+		if( "WabtModule" in window ) {
+			if( typeof window.WabtModule === "function" ) {
+				return new Promise( r => r( window.WabtModule ) );
+			}
+			else if( window.WabtModule instanceof Promise ) {
+				return window.WabtModule;
+			}
+		}
+		else {
+			const wabtPromise = new Promise(
+				( resolve, reject ) => {
+					//set up module & exports for Wabt to use
+					window.exports = window.exports || {};
+					window.exports = window.exports || {};
+
+					//set up a listener for WabtModule
+					Object.defineProperty(
+						window,
+						"WabtModule",
+						{ 	
+							set: moduleBuilder => {
+								delete window.WabtModule;
+								window.WabtModule = moduleBuilder;
+								resolve( moduleBuilder );
+							},
+							get: () => wabtPromise,
+							configurable: true
+						}
+					);
+
+					//load from external script
+					const wabtScript = document.createElement( "script" );
+					wabtScript.onerror = e => {
+						console.error( `Failed to load libwabt.js. Place libwabt.js in same directory as limn.${__VERSION__}.js or load it from a custom path using <script src=".../libwabt.js"></script> before initializing a LimnJS module.` );
+						reject( e );
+					};
+					document.body.appendChild( wabtScript );
+					wabtScript.src = "libwabt.js";
+				}
+			);
+			return wabtPromise;
+		}
+	}
+
+	//returns: binary buffer for WebAssembly.compile()
+	async function compileWabtForInstantiate( 
+		moduleName, //string
+		moduleSource //string
+	) {
+		if( WabtInstance === null ) {
+			const moduleBuilder = await getWabtModule();
+			WabtInstance = moduleBuilder();
+		}
+		const wasmMod = WabtInstance.parseWat( moduleName, moduleSource );
+		wasmMod.resolveNames(); //generate names
+		//wasmMod.validate( features );
+		const binary = wasmMod.toBinary({});
+
+		console.log( "Returning (resolving compileWabtForInstantiate)" );
+		return binary.buffer;
+		//return [];
+	}
+
 	function load( name ) {
 		name = name.replace( /\//g, "." );
 		let s = document.head.appendChild( document.createElement( "script" ) ),
@@ -410,6 +478,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		let def = LimnaryDefinitions[ name ];
 		if( ! def ) return name;
 		else {
+			//check dependency load state
 			ignore = ignore || {};
 			ignore[ name ] = true;
 			let dependencyNames = Object.values( def.imports || {} );
@@ -906,6 +975,45 @@ ${LimnAlias}( "${fullName}", {
 					}
 				}
 
+				let binaries = null,
+					binaryEncodePromises = null;
+				if( def.binaries ) {
+					const keys = Object.keys( def.binaries ),
+						names = [];
+					for( let k of keys ) {
+						if( typeof def.binaries[ k ] === "string" )
+							names.push( k );
+						else {
+							console.error( `${fullName} tried to define WASM source ${k}, but the source was not a string.` );
+							throw "Inherent Module Definition Error";
+						}
+					}
+					if( names.length === 0 ) {
+						console.error( `${fullName} tried to define WASM source, but provided no source.` )
+						throw "Inherent Module Definition Error";
+					}
+					binaries = {};
+					binaryEncodePromises = [];
+					for( let binaryName in def.binaries ) {
+						binaryEncodePromises.push(
+							new Promise( announceEncode => {
+								const sourceCode = def.binaries[ binaryName ];
+								binaries[ binaryName ] = null;
+								compileWabtForInstantiate( 
+										binaryName,
+										sourceCode
+									).then(
+									binaryBuffer => {
+										console.log( "Got to here. Announcing..." );
+										binaries[ binaryName ] = binaryBuffer;
+										announceEncode();
+									}
+								);
+							} )
+						)
+					}
+				}
+
 				const logProxy = ( ...logs ) => {
 						console.log( `${fullName} is logging to the console:` );
 						console.log( ...logs );
@@ -925,8 +1033,8 @@ ${LimnAlias}( "${fullName}", {
 						return (\n` + 
 						def.factory.toLocaleString() + 
 					`\n)();`,
-					compiled = Function( LimnAlias, "imports", "console", code ),
-					method = compiled( badAccessError, passLimns, consoleProxy );
+					compiled = Function( LimnAlias, "imports", "binaries", "console", code ),
+					method = compiled( badAccessError, passLimns, binaries, consoleProxy );
 					
 				if( typeof method !== "function" ) {
 					if( method instanceof Promise ||
@@ -993,10 +1101,32 @@ ${LimnAlias}( "${fullName}", {
 
 				Limnaries[ fullName ].fullName = fullName;
 	
-				acknowledgeLimnaryParse( fullName, Limnaries[ fullName ] );
-				
-				//we return a master promise 
-				return waitForAllReady( fullName );
+				if( binaryEncodePromises !== null ) {
+					console.log( "Have promises: ",binaryEncodePromises )
+					return new Promise(
+						announceReady => {
+							//compile all binaries before awaiting dependencies
+							Promise.all( binaryEncodePromises ).then(
+								() => {
+									console.log( "Got all those done." );
+									acknowledgeLimnaryParse( 
+										fullName, Limnaries[ fullName ] 
+									);
+									waitForAllReady( fullName ).then(
+										readyState => announceReady( readyState )
+									);
+								}
+							)
+						}
+					)
+				}
+				else {
+					acknowledgeLimnaryParse( 
+						fullName, Limnaries[ fullName ] 
+					);
+					//return a master load promise 
+					return waitForAllReady( fullName );
+				}
 			}
 		}
 		//otherwise, we're fetching a limnary method (always a function)
