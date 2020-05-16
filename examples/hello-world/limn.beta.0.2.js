@@ -69,6 +69,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 					# proxy loaded import:
 						# throw on bad parameters
 						# throw on bad returns
+				# compile WASM binaries
 				# build factory
 					# proxy console:
 						# ID limn logging
@@ -78,6 +79,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 					# throw on bad parameters
 					# throw on bad returns
 				# add listeners
+				# await binaries compilation
 				# acknowledge parse
 				# await dependency loading
 			# fetch limn
@@ -111,12 +113,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 			- getDetail()
 			- getSummary()
 			- Global Outline Function ()
-		6. Build
+		6. Base256 Source
+		7. Build
 			- promise polyfill (anonyco's SPromiseMeSpeedJS)
 			- checkIfUsingEmit()
 			- Build Archaic ()
 			- Build Brief ()
-		7. Code Explorer
+		8. Code Explorer
 			- getNewWindow()
 			- Global Explore Function ()
 				# create popup
@@ -189,6 +192,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		Limnaries = {},
 		LiteralNames = {},
 		LimnaryMethods = {},
+		LimnaryBinaries = {},
 		LimnaryPassables = {},
 		LimnaryDefinitions = {},
 		LimnaryDescriptions = {},
@@ -1012,6 +1016,8 @@ ${LimnAlias}( "${fullName}", {
 							} )
 						)
 					}
+					def.usingValidBinaries = true;
+					LimnaryBinaries[ fullName ] = binaries;
 				}
 
 				const logProxy = ( ...logs ) => {
@@ -2377,6 +2383,47 @@ ${LimnAlias}( "${fullName}", {
 		}
 	}
 
+/*
+	Should this get its own repo?
+	I haven't found anything like it.
+*/
+const Base256 = {
+modern: {
+createStringFromBuffer: buffer => {
+	const view = new Uint8Array( buffer ),
+		stringArray = new Array( view.length );
+	for( let i=0; i<view.length; i++ ) {
+		stringArray[ i ] = String.fromCharCode( 400 + view[ i ] );
+	}
+	return stringArray.join( "" );
+},
+createBufferFromString: string => {
+	const buffer = new ArrayBuffer( string.length ),
+		view = new Uint8Array( buffer );
+	for( let i=0; i<string.length; i++ ) {
+		view[ i ] = string.charCodeAt( i ) - 400;
+	}
+	return view;
+}
+},
+archaic: {
+createStringFromBuffer: function( buffer ) {
+	var view = new Uint8Array( buffer ),
+		stringArray = new Array( view.length );
+	for( let i=0; i<view.length; i++ ) {
+		stringArray[ i ] = String.fromCharCode( 400 + view[ i ] );
+	}
+	return stringArray.join( "" );
+},
+createBufferFromString: function( string ) {
+	const buffer = new ArrayBuffer( string.length ),
+		view = new Uint8Array( buffer );
+	for( let i=0; i<string.length; i++ ) {
+		view[ i ] = string.charCodeAt( i ) - 400;
+	}
+	return view;
+} } }
+	
 const promisePolyfill = `'use strict';var G="function"==typeof Object.defineProperties?Object.defineProperty:function(p,r,t){p!=Array.prototype&&p!=Object.prototype&&(p[r]=t.value)};function L(p){p=["object"==typeof globalThis&&globalThis,"object"==typeof window&&window,"object"==typeof self&&self,"object"==typeof global&&global,p];for(var r=0;r<p.length;++r){var t=p[r];if(t&&t.Math==Math)return t}throw Error("Cannot find global object");}var M=L(this);function Q(){Q=function(){};M.Symbol||(M.Symbol=R)}
 function S(p,r){this.a=p;G(this,"description",{configurable:!0,writable:!0,value:r})}S.prototype.toString=function(){return this.a};var R=function(){function p(t){if(this instanceof p)throw new TypeError("Symbol is not a constructor");return new S("jscomp_symbol_"+(t||"")+"_"+r++,t)}var r=0;return p}();
 (function(p){function r(b){b()}function t(b){b(this)}function H(){if(y){do u=!1,D.shift()();while(--y)}u=!1}function B(b,k,d){this.then=b;this["catch"]=k;this["finally"]=d}function v(b){function k(a){0===h&&(F(a)?a.then(k,d):(g=a,h=2,null!==e&&("function"===typeof e?e(a):e.forEach(t,a),e=null),c=null,null!==l&&("function"===typeof l?l():l.forEach(r),l=null)))}function d(a){0===h&&(g=a,h=1,null!==c&&("function"===typeof c?c(a):c.forEach(t,a),c=null),e=null,null!==l&&("function"===typeof l?l():l.forEach(r),
@@ -2408,9 +2455,17 @@ function checkIfUsingEmit() {
 	return usingEmitter;
 }
 
+function checkIfUsingBinaries() {
+	for( let name in LimnaryDefinitions )
+		if( LimnaryDefinitions[ name ].usingValidBinaries === true )
+			return true;
+	return false;
+}
+
 function ArchaicBuild( globalName ) {
 	//compatible with IE 9 (Object.freeze, Function.prototype.apply with generic array arguments)
-	let usingEmitter = checkIfUsingEmit();
+	const usingEmitter = checkIfUsingEmit(),
+		usingBinaries = checkIfUsingBinaries();
 	let emitFunction = usingEmitter ?
 `${globalName}.e = function( name, detail ) {
 	return new Promise( function( endEmit ) {
@@ -2442,7 +2497,9 @@ ${ usingEmitter ? `	if( ${globalName}.listen ) {
 }`,
 		opener = `
 var ${globalName} = {};
-
+${ usingBinaries ? `
+var _B256 = ${Base256.archaic.createBufferFromString.toLocaleString()};
+` : `` }
 var Limnaries = ${globalName}.Limnaries = {},
 ${ usingEmitter ? `	Listeners = ${globalName}.Listeners = {},
 ` : ""}	Passables = ${globalName}.Passables = {};`,
@@ -2454,19 +2511,29 @@ ${ usingEmitter ? `	Listeners = ${globalName}.Listeners = {},
 			listen = definition.listen ?
 				( definition.listen.indexOf( "|" ) > -1 ?
 				definition.listen.split( "|" ) : [ definition.listen ] ) : false,
-			limns = {};
+			limns = {},
+			binaries = {},
+			binaryObject = null;
 		for( let localName in definition.imports )
 			limns[ localName ] = definition.imports[ localName ].replace( /\//g, "." );
 		if( definition.emits ) limns.emit = null;
-		let limnaryObject = 
-				`${globalName}.Passables[ "${name}" ] = ${JSON.stringify(limns)||"{}"}`,
-			defineObject =
+		let limnaryObject = `${globalName}.Passables[ "${name}" ] = ${JSON.stringify(limns)||"{}"}`;
+		if( usingBinaries ) {
+			const bins = LimnaryBinaries[ name ];
+			for( let binaryName in bins ) {
+				const bin = bins[ binaryName ];
+				const binString = Base256.modern.createStringFromBuffer( bin );
+				binaries[ binaryName ] = `_B256('${binString}')`;
+			}
+			binaryObject = `, ${JSON.stringify( binaries ).replace( /"/g, "" )}`;
+		}
+		let defineObject =
 `${globalName}._( {
 	Limnaries: ${globalName}.Limnaries,
 	name: "${name}",
-	factory: ( imports => {
+	factory: ( function( ${usingBinaries?`imports, binaries`:`imports`} ) {
 	return ${factoryCode}
-	} )( ${limnaryObject} ),
+	} )( ${limnaryObject}${usingBinaries?binaryObject:""} ),
 ${ usingEmitter ? `	Listeners: ${globalName}.Listeners,
 ` : "" }	listen: ${listen?"[\""+listen.join('","')+"\"]":"false"}
 } );`
@@ -2503,10 +2570,10 @@ ${ usingEmitter ? `		if( localReference === "emit" )
 	Object.freeze( passables );
 }
 Object.freeze( Passables );
-delete ${globalName}.e;` : "" }
+delete ${globalName}.e;
 passables = undefined;
 name = undefined;
-localReference = undefined;
+localReference = undefined;` : "" }
 
 (
 	function( preexistingLimnaryLookup ) {
@@ -2567,7 +2634,8 @@ globalizer
 }
 
 function BriefBuild( globalName ) {
-	let usingEmitter = checkIfUsingEmit();
+	const usingEmitter = checkIfUsingEmit(),
+		usingBinaries = checkIfUsingBinaries();
 	let emitFunction = usingEmitter ?
 `${globalName}.e = async ( name, detail ) => {
 	let alls = [];
@@ -2586,7 +2654,9 @@ ${ usingEmitter ? `	if( ${globalName}.listen ) for( let l of ${globalName}.liste
 }`,
 		opener = `
 let ${globalName} = {};
-
+${ usingBinaries ? `
+var _B256 = ${Base256.modern.createBufferFromString.toLocaleString()};
+` : `` }
 const Limnaries = ${globalName}.Limnaries = {},
 ${ usingEmitter ? `	Listeners = ${globalName}.Listeners = {},
 ` : ""}	Passables = ${globalName}.Passables = {};
@@ -2599,19 +2669,29 @@ ${ usingEmitter ? `	Listeners = ${globalName}.Listeners = {},
 			listen = definition.listen ?
 				( definition.listen.indexOf( "|" ) > -1 ?
 				definition.listen.split( "|" ) : [ definition.listen ] ) : false,
-			limns = {};
+			limns = {},
+			binaries = {},
+			binaryObject = null;
 		for( let localName in definition.imports )
 			limns[ localName ] = definition.imports[ localName ].replace( /\//g, "." );
 		if( definition.emits ) limns[ "emit" ] = null;
-		let limnaryObject = 
-				`${globalName}.Passables[ "${name}" ] = ${JSON.stringify(limns)||"{}"}`,
-			defineObject =
+		let limnaryObject = `${globalName}.Passables[ "${name}" ] = ${JSON.stringify(limns)||"{}"}`;
+		if( usingBinaries ) {
+			const bins = LimnaryBinaries[ name ];
+			for( let binaryName in bins ) {
+				const bin = bins[ binaryName ];
+				const binString = Base256.modern.createStringFromBuffer( bin );
+				binaries[ binaryName ] = `_B256('${binString}')`;
+			}
+			binaryObject = `, ${JSON.stringify( binaries ).replace( /"/g, "" )}`;
+		}
+		let defineObject =
 `${globalName}._( {
 	Limnaries: ${globalName}.Limnaries,
 	name: "${name}",
-	factory: ( imports => {
+	factory: ( ${usingBinaries?`( imports, binaries )`:`imports`} => {
 		return ${factoryCode}
-	} )( ${limnaryObject} ),
+	} )( ${limnaryObject}${usingBinaries?binaryObject:""} ),
 ${ usingEmitter ? `	Listeners: ${globalName}.Listeners,
 ` : ""}	listen: ${listen?"[\""+listen.join('","')+"\"]":"false"}
 } );`
