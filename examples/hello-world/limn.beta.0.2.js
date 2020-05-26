@@ -408,7 +408,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 		//wasmMod.validate( features );
 		const binary = wasmMod.toBinary({});
 
-		console.log( "Returning (resolving compileWabtForInstantiate)" );
 		return binary.buffer;
 		//return [];
 	}
@@ -515,7 +514,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 			if( pdefs.length !== params.length ) {
 				let unsettables = false;
 				for( let pdef of pdefs ) {
-					if( isUnset( pdef.split( ":" ).pop() ) ) {
+					if( isUnset( pdef.split( ":" ).pop().replace( /[\s\r\n]+/gm, "" ) ) ) {
 						unsettables = true;
 						break;
 					}
@@ -537,7 +536,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 			}
 			for( let i=0; i<pdefs.length; i++ ) {
 				if( i === params.length ) {
-					if( isUnset( pdefs[ i ].split( ":" ).pop() ) )
+					if( isUnset( pdefs[ i ].split( ":" ).pop().replace( /[\s\r\n]+/gm, "" ) ) )
 						return true;
 					else {
 						const manyOrFew = "too few";
@@ -1008,7 +1007,6 @@ ${LimnAlias}( "${fullName}", {
 										sourceCode
 									).then(
 									binaryBuffer => {
-										console.log( "Got to here. Announcing..." );
 										binaries[ binaryName ] = binaryBuffer;
 										announceEncode();
 									}
@@ -1106,15 +1104,13 @@ ${LimnAlias}( "${fullName}", {
 
 
 				Limnaries[ fullName ].fullName = fullName;
-	
+
 				if( binaryEncodePromises !== null ) {
-					console.log( "Have promises: ",binaryEncodePromises )
 					return new Promise(
 						announceReady => {
 							//compile all binaries before awaiting dependencies
 							Promise.all( binaryEncodePromises ).then(
 								() => {
-									console.log( "Got all those done." );
 									acknowledgeLimnaryParse( 
 										fullName, Limnaries[ fullName ] 
 									);
@@ -1130,8 +1126,9 @@ ${LimnAlias}( "${fullName}", {
 					acknowledgeLimnaryParse( 
 						fullName, Limnaries[ fullName ] 
 					);
+					const allReadyPromise = waitForAllReady( fullName );
 					//return a master load promise 
-					return waitForAllReady( fullName );
+					return allReadyPromise;
 				}
 			}
 		}
@@ -2019,7 +2016,6 @@ ${LimnAlias}( "${fullName}", {
 						let n = names[ i ];
 						if( n.indexOf( ":" ) > -1 ) n = n.split( ":" )[ 1 ];
 						if( n.indexOf( "*" ) === -1 ) n += "*";
-						console.log( "Getting ", n );
 						let addDef = getOutline( n );
 						if( addDef === false )
 							return false; //joined on undefined outline
